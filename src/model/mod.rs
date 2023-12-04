@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use futures_util::StreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use mongodb::{
     bson::{doc, Document},
-    options::FindOptions,
+    options::{FindOptions, UpdateOptions},
     Database,
 };
 use regex::Regex;
@@ -11,12 +11,24 @@ use regex::Regex;
 use chrono::NaiveDate;
 use tokio_postgres::Client as PostgresClient;
 // use uuid::Uuid;
+pub const VOUCHER_COLLECTION: [&str; 8] = [
+    "paymemts",
+    "contras",
+    "receipts",
+    "journals",
+    "purchases",
+    "credit_notes",
+    "debit_notes",
+    "sales",
+];
 
+mod account;
 mod financial_year;
 mod member;
 mod rack;
 mod tds_nature_of_payment;
 
+pub use account::Account;
 pub use financial_year::FinancialYear;
 pub use member::Member;
 pub use rack::Rack;

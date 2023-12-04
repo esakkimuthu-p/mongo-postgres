@@ -47,6 +47,8 @@ async fn main() {
     Member::create(&mongodb, &client).await;
     FinancialYear::create(&mongodb, &client).await;
     TdsNatureOfPayment::create(&mongodb, &client).await;
+    Account::map(&mongodb).await;
+    Account::create(&mongodb, &client).await;
 
     println!("Hello, world!");
 }
