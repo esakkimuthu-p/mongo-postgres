@@ -100,7 +100,8 @@ impl Account {
                     "INSERT INTO accounts 
                     (
                         id,name,display_name,val_name,alias_name,val_alias_name,account_type
-                    ) 
+                    )
+                    OVERRIDING SYSTEM VALUE
                     VALUES ($1, $2, $3, $4, $5, $6, $7)",
                     &[
                         &id,

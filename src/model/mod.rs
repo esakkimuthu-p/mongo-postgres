@@ -12,7 +12,7 @@ use chrono::NaiveDate;
 use tokio_postgres::Client as PostgresClient;
 // use uuid::Uuid;
 pub const VOUCHER_COLLECTION: [&str; 8] = [
-    "paymemts",
+    "payments",
     "contras",
     "receipts",
     "journals",
@@ -23,13 +23,17 @@ pub const VOUCHER_COLLECTION: [&str; 8] = [
 ];
 
 mod account;
+mod branch;
 mod financial_year;
+mod gst_registration;
 mod member;
 mod rack;
 mod tds_nature_of_payment;
 
 pub use account::Account;
+pub use branch::Branch;
 pub use financial_year::FinancialYear;
+pub use gst_registration::GstRegistration;
 pub use member::Member;
 pub use rack::Rack;
 pub use tds_nature_of_payment::TdsNatureOfPayment;

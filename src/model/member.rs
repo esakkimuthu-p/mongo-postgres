@@ -17,7 +17,7 @@ impl Member {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        // let mut inv_branch_updates = Vec::new();
+        let mut ref_branch_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -31,6 +31,7 @@ impl Member {
                 .execute(
                     "INSERT INTO members 
                         (id,name,user_id, pass,nick_name,remote_access, is_root, perms)
+                    OVERRIDING SYSTEM VALUE
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                     &[
                         &id,
@@ -49,11 +50,21 @@ impl Member {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
+            ref_branch_updates.push(doc! {
+                "q": { "members": object_id },
+                "u": { "$addToSet": { "postgresMembers": id} },
+                "multi": true
+            });
         }
         if !updates.is_empty() {
             let command = doc! {
                 "update": "members",
                 "updates": &updates
+            };
+            mongodb.run_command(command, None).await.unwrap();
+            let command = doc! {
+                "update": "branches",
+                "updates": &ref_branch_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

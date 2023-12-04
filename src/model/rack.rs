@@ -23,7 +23,7 @@ impl Rack {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO racks (id,name,display_name, val_name) VALUES ($1, $2, $3, $4)",
+                    "INSERT INTO racks (id,name,display_name, val_name) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),

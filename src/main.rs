@@ -49,6 +49,8 @@ async fn main() {
     TdsNatureOfPayment::create(&mongodb, &client).await;
     Account::map(&mongodb).await;
     Account::create(&mongodb, &client).await;
+    GstRegistration::create(&mongodb, &client).await;
+    Branch::create(&mongodb, &client).await;
 
     println!("Hello, world!");
 }

@@ -25,6 +25,7 @@ impl TdsNatureOfPayment {
                 .execute(
                     "INSERT INTO tds_nature_of_payments 
                     (id,name,display_name,val_name,section,indHufRate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
+                    OVERRIDING SYSTEM VALUE
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
                     &[
                         &id,
