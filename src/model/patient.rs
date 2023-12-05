@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct TdsNatureOfPayment;
+pub struct Patient;
 
-impl TdsNatureOfPayment {
+impl Patient {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("tds_nature_of_payments")
+            .collection::<Document>("patients")
             .find(
                 doc! {},
                 find_opts(
@@ -17,27 +17,19 @@ impl TdsNatureOfPayment {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
+        let mut sale_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO tds_nature_of_payments 
-                    (id,name,display_name,val_name,section,indHufRate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
-                    OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                    "INSERT INTO patients (id,name,display_name, val_name, customer) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("displayName").unwrap(),
                         &val_name(d.get_str("name").unwrap()),
-                        &d.get_str("section").ok(),
-                        &d._get_f64("indHufRate").unwrap_or_default(),
-                        &d._get_f64("indHufRateWoPan").unwrap_or_default(),
-                        &d._get_f64("otherDeducteeRate").unwrap_or_default(),
-                        &d._get_f64("otherDeducteeRateWoPan").unwrap_or_default(),
-                        &d._get_f64("threshold").unwrap_or_default(),
+                        &d.get_i32("postgresContact").unwrap(),
                     ],
                 )
                 .await
@@ -46,23 +38,23 @@ impl TdsNatureOfPayment {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_updates.push(doc! {
-                "q": { "tdsNatureOfPayment": object_id },
-                "u": { "$set":{"postgresTds": id }},
+            sale_updates.push(doc! {
+                "q": { "patient": object_id },
+                "u": { "$set": { "postgresPatient": id} },
                 "multi": true,
             });
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "tds_nature_of_payments",
+                "update": "patients",
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }
-        if !ref_updates.is_empty() {
+        if !sale_updates.is_empty() {
             let command = doc! {
-                "update": "accounts",
-                "updates": &ref_updates
+                "update": "sales",
+                "updates": &sale_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

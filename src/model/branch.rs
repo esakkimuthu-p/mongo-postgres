@@ -20,6 +20,7 @@ impl Branch {
         let mut ref_updates = Vec::new();
         let mut ref_updates2 = Vec::new();
         let mut inv_branch_updates = Vec::new();
+        let mut ref_branch_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -91,6 +92,11 @@ impl Branch {
                 "multi": true,
                 "arrayFilters": [ { "elm.branch": {"$eq":object_id} } ]
             });
+            ref_branch_updates.push(doc! {
+                "q": { "branches": object_id },
+                "u": { "$addToSet": { "postgresBranches": id} },
+                "multi": true
+            });
         }
         if !updates.is_empty() {
             let command = doc! {
@@ -101,6 +107,11 @@ impl Branch {
             let command = doc! {
                 "update": "batches",
                 "updates": &ref_updates
+            };
+            mongodb.run_command(command, None).await.unwrap();
+            let command = doc! {
+                "update": "desktop_clients",
+                "updates": &ref_branch_updates
             };
             mongodb.run_command(command, None).await.unwrap();
             for coll in VOUCHER_COLLECTION {

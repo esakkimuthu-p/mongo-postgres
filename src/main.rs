@@ -52,6 +52,14 @@ async fn main() {
     GstRegistration::create(&mongodb, &client).await;
     Branch::create(&mongodb, &client).await;
     Contact::create(&mongodb, &client).await;
+    Doctor::create(&mongodb, &client).await;
+    Patient::create(&mongodb, &client).await;
+    Manufacturer::create(&mongodb, &client).await;
+    Section::create(&mongodb, &client).await;
+    PharmaSalt::create(&mongodb, &client).await;
+    SaleIncharge::create(&mongodb, &client).await;
+    PrintTemplate::create(&mongodb, &client).await;
+    DesktopClient::create(&mongodb, &client).await;
 
     println!("Hello, world!");
 }

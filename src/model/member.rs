@@ -10,7 +10,7 @@ impl Member {
                 doc! {},
                 find_opts(
                     doc! {"createdBy": 0, "createdAt": 0, "updatedAt": 0, "updatedBy": 0},
-                    doc! {"_id": 1},
+                    doc! {"isRoot": -1, "_id": 1},
                 ),
             )
             .await

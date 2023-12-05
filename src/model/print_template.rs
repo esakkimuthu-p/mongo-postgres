@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct Rack;
+pub struct PrintTemplate;
 
-impl Rack {
+impl PrintTemplate {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("racks")
+            .collection::<Document>("print_templates")
             .find(
                 doc! {},
                 find_opts(
@@ -17,18 +17,18 @@ impl Rack {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut inv_branch_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO racks (id,name,display_name, val_name) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4)",
+                    "INSERT INTO print_templates (id,name,template,layout,voucher_mode) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
+                        &d.get_str("template").unwrap(),
+                        &d.get_str("layout").unwrap(),
+                        &d.get_str("voucherMode").ok(),
                     ],
                 )
                 .await
@@ -37,22 +37,11 @@ impl Rack {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            inv_branch_updates.push(doc! {
-                "q": { "branchDetails": {"$elemMatch": {"rack.id": object_id }} },
-                "u": { "$set": { "branchDetails.$[elm].postgresRack": id} },
-                "multi": true,
-                "arrayFilters": [ { "elm.rack.id": {"$eq":object_id} } ]
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "racks",
+                "update": "print_templates",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "inventories",
-                "updates": &inv_branch_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

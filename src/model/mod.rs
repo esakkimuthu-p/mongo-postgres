@@ -25,19 +25,35 @@ pub const VOUCHER_COLLECTION: [&str; 8] = [
 mod account;
 mod branch;
 mod contact;
+mod desktop_client;
+mod doctor;
 mod financial_year;
 mod gst_registration;
+mod manufacturer;
 mod member;
+mod patient;
+mod pharma_salt;
+mod print_template;
 mod rack;
+mod sale_incharge;
+mod section;
 mod tds_nature_of_payment;
 
 pub use account::Account;
 pub use branch::Branch;
 pub use contact::Contact;
+pub use desktop_client::DesktopClient;
+pub use doctor::Doctor;
 pub use financial_year::FinancialYear;
 pub use gst_registration::GstRegistration;
+pub use manufacturer::Manufacturer;
 pub use member::Member;
+pub use patient::Patient;
+pub use pharma_salt::PharmaSalt;
+pub use print_template::PrintTemplate;
 pub use rack::Rack;
+pub use sale_incharge::SaleIncharge;
+pub use section::Section;
 pub use tds_nature_of_payment::TdsNatureOfPayment;
 
 pub trait Doc {

@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct Rack;
+pub struct DesktopClient;
 
-impl Rack {
+impl DesktopClient {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("racks")
+            .collection::<Document>("desktop_clients")
             .find(
                 doc! {},
                 find_opts(
@@ -17,18 +17,25 @@ impl Rack {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut inv_branch_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
+            let branches = d
+                .get_array("postgresBranches")
+                .unwrap_or(&vec![])
+                .iter()
+                .map(|x| x.as_i32().unwrap())
+                .collect::<Vec<i32>>();
             postgres
                 .execute(
-                    "INSERT INTO racks (id,name,display_name, val_name) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4)",
+                    "INSERT INTO desktop_clients (id,name,display_name,val_name,branches,access) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5, $6`)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
+                        &d.get_str("display_name").unwrap(),
                         &val_name(d.get_str("name").unwrap()),
+                        &branches,
+                        &d.get_bool("access").ok(),
                     ],
                 )
                 .await
@@ -37,22 +44,11 @@ impl Rack {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            inv_branch_updates.push(doc! {
-                "q": { "branchDetails": {"$elemMatch": {"rack.id": object_id }} },
-                "u": { "$set": { "branchDetails.$[elm].postgresRack": id} },
-                "multi": true,
-                "arrayFilters": [ { "elm.rack.id": {"$eq":object_id} } ]
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "racks",
+                "update": "desktop_clients",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "inventories",
-                "updates": &inv_branch_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

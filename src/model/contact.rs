@@ -81,11 +81,6 @@ impl Contact {
                 serde_json::to_value(y).unwrap()
             });
 
-            //   tracking_account BOOLEAN NOT NULL DEFAULT FALSE,
-            //   credit_account INT REFERENCES accounts, -- bwd account type
-            //   tds_deductee_type TEXT REFERENCES tds_deductee_types,
-            //   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            //   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             let mut gst_info = doc! {};
             if let Ok(gst) = d.get_document("gstInfo") {
                 gst_info.insert("reg_type", gst.get_str("regType").unwrap());
