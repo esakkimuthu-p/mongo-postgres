@@ -92,6 +92,7 @@ impl Account {
         let mut ref_updates = Vec::new();
         let mut voucher_ref_updates = Vec::new();
         let mut parent_ref_updates = Vec::new();
+        let mut contact_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -123,6 +124,10 @@ impl Account {
                 "q": { "parentAccount": object_id },
                 "u": { "$set": { "postgresParent": id} },
                 "multi": true
+            });
+            contact_ref_updates.push(doc! {
+                "q": { "creditAccount": object_id },
+                "u": { "$set": { "postgresCrAcc": id} },
             });
             ref_updates.push(doc! {
                 "q": { "account": object_id },
@@ -158,6 +163,11 @@ impl Account {
             let command = doc! {
                 "update": "branches",
                 "updates": &ref_updates
+            };
+            mongodb.run_command(command, None).await.unwrap();
+            let command = doc! {
+                "update": "contacts",
+                "updates": &contact_ref_updates
             };
             mongodb.run_command(command, None).await.unwrap();
 

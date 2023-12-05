@@ -51,6 +51,7 @@ async fn main() {
     Account::create(&mongodb, &client).await;
     GstRegistration::create(&mongodb, &client).await;
     Branch::create(&mongodb, &client).await;
+    Contact::create(&mongodb, &client).await;
 
     println!("Hello, world!");
 }

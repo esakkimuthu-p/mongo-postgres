@@ -24,6 +24,7 @@ pub const VOUCHER_COLLECTION: [&str; 8] = [
 
 mod account;
 mod branch;
+mod contact;
 mod financial_year;
 mod gst_registration;
 mod member;
@@ -32,6 +33,7 @@ mod tds_nature_of_payment;
 
 pub use account::Account;
 pub use branch::Branch;
+pub use contact::Contact;
 pub use financial_year::FinancialYear;
 pub use gst_registration::GstRegistration;
 pub use member::Member;
