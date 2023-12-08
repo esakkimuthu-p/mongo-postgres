@@ -4,49 +4,6 @@ pub struct Contact;
 
 impl Contact {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
-        println!("contacts duplicate fix start");
-        let docs = mongodb
-            .collection::<Document>("contacts")
-            .aggregate(
-                vec![
-                    doc! {"$group": {
-                        "_id": { "validateName": "$validateName", "mob": "$contactInfo.mobile" },
-                        "ids": { "$addToSet": "$_id" }
-                    }},
-                    doc! { "$project": { "ids": 1, "dup": { "$gt": [{ "$size": "$ids" }, 1] } } },
-                    doc! { "$match": { "dup": true }},
-                    doc! { "$project": { "ids": 1, "_id": 0 } },
-                ],
-                None,
-            )
-            .await
-            .unwrap()
-            .try_collect::<Vec<Document>>()
-            .await
-            .unwrap();
-        let mut updates = Vec::new();
-        for duplicates in docs {
-            for (idx, dup_id) in duplicates
-                .get_array("ids")
-                .unwrap_or(&vec![])
-                .iter()
-                .map(|x| x.as_object_id().unwrap_or_default())
-                .enumerate()
-            {
-                if idx != 0 {
-                    updates.push(doc! {"q": { "_id": dup_id }, "u": [{"$set": {"name": {"$concat": ["$name", format!("Dup{}", idx),]}, "displayName": {"$concat": ["$displayName", format!("Dup{} ", idx),]}} }]});
-                }
-            }
-        }
-        println!("count, {}", &updates.len());
-        if !updates.is_empty() {
-            let command = doc! {
-                "update": "contacts",
-                "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-        }
-        println!("contacts duplicate fix end");
         let mut cur = mongodb
             .collection::<Document>("contacts")
             .find(
@@ -60,7 +17,8 @@ impl Contact {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
+        let mut cus_ref_updates = Vec::new();
+        let mut ven_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -101,7 +59,6 @@ impl Contact {
                 )
                 .await
                 .unwrap();
-            // ALTER TABLE contacts ALTER COLUMN contact_type TYPE TEXT;
             postgres
                 .execute(
                     "INSERT INTO contacts 
@@ -131,8 +88,13 @@ impl Contact {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_updates.push(doc! {
-                "q": {"$or": [{ "customer":object_id }, { "vendor":object_id }]},
+            cus_ref_updates.push(doc! {
+                "q": { "customer":object_id },
+                "u": { "$set": { "postgresContact": id} },
+                "multi": true,
+            });
+            ven_ref_updates.push(doc! {
+                "q": { "vendor":object_id },
                 "u": { "$set": { "postgresContact": id} },
                 "multi": true,
             });
@@ -145,19 +107,26 @@ impl Contact {
             mongodb.run_command(command, None).await.unwrap();
             let command = doc! {
                 "update": "patients",
-                "updates": &ref_updates
+                "updates": &cus_ref_updates
             };
             mongodb.run_command(command, None).await.unwrap();
-            for coll in VOUCHER_COLLECTION {
+            for coll in ["sales", "credit_notes"] {
                 let command = doc! {
                     "update": coll,
-                    "updates": &ref_updates
+                    "updates": &cus_ref_updates
+                };
+                mongodb.run_command(command, None).await.unwrap();
+            }
+            for coll in ["purchases", "debit_notes"] {
+                let command = doc! {
+                    "update": coll,
+                    "updates": &cus_ref_updates
                 };
                 mongodb.run_command(command, None).await.unwrap();
             }
             let command = doc! {
                 "update": "inventories",
-                "updates": &ref_updates
+                "updates": &ven_ref_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

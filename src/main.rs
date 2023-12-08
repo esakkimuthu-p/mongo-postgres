@@ -43,6 +43,7 @@ async fn main() {
         .await
         .unwrap()
         .database("velavanmed");
+    duplicate_fix(&mongodb).await;
     Rack::create(&mongodb, &client).await;
     Member::create(&mongodb, &client).await;
     FinancialYear::create(&mongodb, &client).await;
