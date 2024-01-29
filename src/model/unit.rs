@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct GstRegistration;
+pub struct Unit;
 
-impl GstRegistration {
+impl Unit {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("gst_registrations")
+            .collection::<Document>("units")
             .find(
                 doc! {},
                 find_opts(
@@ -17,25 +17,19 @@ impl GstRegistration {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
+        let mut inv_unit_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            let gst_no = d.get_str("gstNo").unwrap_or_default();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO gst_registrations 
-                    (id, gst_no, state, username,email,e_invoice_username, e_password) 
-                    OVERRIDING SYSTEM VALUE VALUES 
-                    ($1, $2, $3, $4, $5, $6, $7)",
+                    "INSERT INTO units (id,name,uqc,symbol,precision) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5::INT::SMALLINT)",
                     &[
-                        &id,
-                        &gst_no,
-                        &"33",
-                        &d.get_str("username").ok(),
-                        &d.get_str("email").ok(),
-                        &d.get_str("eInvoiceUsername").ok(),
-                        &d.get_str("ePassword").ok(),
+                        &id, 
+                        &d.get_str("name").unwrap(), 
+                        &d.get_str("uqc").unwrap(), 
+                        &d.get_str("symbol").unwrap(), 
+                        &1
                     ],
                 )
                 .await
@@ -44,23 +38,22 @@ impl GstRegistration {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_updates.push(doc! {
-                "q": { "gstInfo.gstNo": &gst_no },
-                "u": { "$set": { "postgresGst": id} },
+            inv_unit_updates.push(doc! {
+                "q": { "units": {"$elemMatch": {"unitId": object_id }} },
+                "u": { "$set": { "units.$[elm].postgresUnit": id} },
                 "multi": true,
+                "arrayFilters": [ { "elm.unitId": {"$eq":object_id} } ]
             });
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "gst_registrations",
+                "update": "units",
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();
-        }
-        if !ref_updates.is_empty() {
             let command = doc! {
-                "update": "branches",
-                "updates": &ref_updates
+                "update": "inventories",
+                "updates": &inv_unit_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

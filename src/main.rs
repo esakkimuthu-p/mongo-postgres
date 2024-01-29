@@ -17,7 +17,7 @@ struct Args {
     )]
     uri: String,
 
-    /// surreal Organization HOST.
+    /// postgres Organization HOST.
     #[clap(
         short,
         long,
@@ -43,8 +43,6 @@ async fn main() {
         .await
         .unwrap()
         .database("velavanmed");
-    duplicate_fix(&mongodb).await;
-    Rack::create(&mongodb, &client).await;
     Member::create(&mongodb, &client).await;
     FinancialYear::create(&mongodb, &client).await;
     TdsNatureOfPayment::create(&mongodb, &client).await;
@@ -55,8 +53,11 @@ async fn main() {
     Contact::create(&mongodb, &client).await;
     Doctor::create(&mongodb, &client).await;
     Patient::create(&mongodb, &client).await;
+    Salt::create(&mongodb, &client).await;
     Manufacturer::create(&mongodb, &client).await;
-    Section::create(&mongodb, &client).await;
+    Division::create(&mongodb, &client).await;
+    Unit::create(&mongodb, &client).await;
+    Inventory::create(&mongodb, &client).await;
     PharmaSalt::create(&mongodb, &client).await;
     SaleIncharge::create(&mongodb, &client).await;
     PrintTemplate::create(&mongodb, &client).await;

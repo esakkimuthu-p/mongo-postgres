@@ -18,28 +18,35 @@ impl Branch {
         let mut id: i32 = 0;
         let mut updates = Vec::new();
         let mut ref_updates = Vec::new();
-        let mut ref_updates2 = Vec::new();
         let mut inv_branch_updates = Vec::new();
         let mut ref_branch_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
-            let contact_info = d
-                .get_document("contactInfo")
-                .ok()
-                .map(|x| serde_json::to_value(x).unwrap());
-            let address_info = d.get_document("addressInfo").ok().map(|x| {
-                let mut y = x.clone();
-                if let Ok(a) = x.get_str("alternateMobile") {
-                    y.remove("alternateMobile");
-                    y.insert("alternate_mobile", a);
-                }
-                if let Ok(a) = x.get_str("contactPerson") {
-                    y.remove("contactPerson");
-                    y.insert("contact_person", a);
-                }
-                serde_json::to_value(y).unwrap()
-            });
+            let mut mobile = None;
+            let mut alternate_mobile = None;
+            let mut email = None;
+            let mut telephone = None;
+            let mut contact_person = None;
+            if let Ok(contact_info) = d.get_document("contactInfo") {
+                mobile = contact_info.get_str("mobile").ok();
+                alternate_mobile = contact_info.get_str("alternateMobile").ok();
+                email = contact_info.get_str("email").ok();
+                telephone = contact_info.get_str("telephone").ok();
+                contact_person = contact_info.get_str("contactPerson").ok();
+            }
+            let mut address = None;
+            let mut city = None;
+            let mut pincode = None;
+            let mut state = None;
+            let mut country = None;
+            if let Ok(address_info) = d.get_document("addressInfo") {
+                address = address_info.get_str("address").ok();
+                city = address_info.get_str("city").ok();
+                pincode = address_info.get_str("pincode").ok();
+                state = Some("33");
+                country = Some("INDIA");
+            }
             let misc = d
                 .get_str("licenseNo")
                 .ok()
@@ -53,16 +60,24 @@ impl Branch {
             postgres
                 .execute(
                     "INSERT INTO branches 
-                        (id,name,val_name,display_name,contact_info,address_info, gst_registration, voucher_no_prefix, misc, members, account) 
+                        (id,name,mobile,alternate_mobile,email,telephone,contact_person,address,
+                            city,pincode,state,country, gst_registration, voucher_no_prefix, 
+                            misc, members, account) 
                     OVERRIDING SYSTEM VALUE VALUES 
-                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
-                        &d.get_str("displayName").unwrap(),
-                        &contact_info,
-                        &address_info,
+                        &mobile,
+                        &alternate_mobile,
+                        &email,
+                        &telephone,
+                        &contact_person,
+                        &address,
+                        &city,
+                        &pincode,
+                        &state,
+                        &country,
                         &d.get_i32("postgresGst").unwrap(),
                         &d.get_str("voucherNoPrefix").unwrap(),
                         &misc,
@@ -81,11 +96,11 @@ impl Branch {
                 "u": { "$set": { "postgresBranch": id} },
                 "multi": true,
             });
-            ref_updates2.push(doc! {
-                "q": { "altBranch":object_id },
-                "u": { "$set": { "postgresAltBranch": id} },
-                "multi": true,
-            });
+            // ref_updates2.push(doc! {
+            //     "q": { "altBranch":object_id },
+            //     "u": { "$set": { "postgresAltBranch": id} },
+            //     "multi": true,
+            // });
             inv_branch_updates.push(doc! {
                 "q": { "branchDetails.branch": object_id  },
                 "u": { "$set": { "branchDetails.$[elm].postgresBranch": id} },
@@ -121,35 +136,35 @@ impl Branch {
                 };
                 mongodb.run_command(command, None).await.unwrap();
             }
-            let command = doc! {
-                "update": "stock_transfers",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
+            // let command = doc! {
+            //     "update": "stock_transfers",
+            //     "updates": &ref_updates
+            // };
+            // mongodb.run_command(command, None).await.unwrap();
 
-            let command = doc! {
-                "update": "stock_transfers",
-                "updates": &ref_updates2
-            };
-            mongodb.run_command(command, None).await.unwrap();
+            // let command = doc! {
+            //     "update": "stock_transfers",
+            //     "updates": &ref_updates2
+            // };
+            // mongodb.run_command(command, None).await.unwrap();
 
-            let command = doc! {
-                "update": "stock_adjustments",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
+            // let command = doc! {
+            //     "update": "stock_adjustments",
+            //     "updates": &ref_updates
+            // };
+            // mongodb.run_command(command, None).await.unwrap();
 
-            let command = doc! {
-                "update": "material_conversions",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
+            // let command = doc! {
+            //     "update": "material_conversions",
+            //     "updates": &ref_updates
+            // };
+            // mongodb.run_command(command, None).await.unwrap();
 
-            let command = doc! {
-                "update": "manufacturing_journals",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
+            // let command = doc! {
+            //     "update": "manufacturing_journals",
+            //     "updates": &ref_updates
+            // };
+            // mongodb.run_command(command, None).await.unwrap();
 
             let command = doc! {
                 "update": "account_openings",

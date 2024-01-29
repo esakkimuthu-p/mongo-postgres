@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct GstRegistration;
+pub struct Salt;
 
-impl GstRegistration {
+impl Salt {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("gst_registrations")
+            .collection::<Document>("pharma_salts")
             .find(
                 doc! {},
                 find_opts(
@@ -17,26 +17,14 @@ impl GstRegistration {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
+        let mut inv_salt_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            let gst_no = d.get_str("gstNo").unwrap_or_default();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO gst_registrations 
-                    (id, gst_no, state, username,email,e_invoice_username, e_password) 
-                    OVERRIDING SYSTEM VALUE VALUES 
-                    ($1, $2, $3, $4, $5, $6, $7)",
-                    &[
-                        &id,
-                        &gst_no,
-                        &"33",
-                        &d.get_str("username").ok(),
-                        &d.get_str("email").ok(),
-                        &d.get_str("eInvoiceUsername").ok(),
-                        &d.get_str("ePassword").ok(),
-                    ],
+                    "INSERT INTO pharma_salts (id,name) OVERRIDING SYSTEM VALUE VALUES ($1, $2)",
+                    &[&id, &d.get_str("name").unwrap()],
                 )
                 .await
                 .unwrap();
@@ -44,23 +32,21 @@ impl GstRegistration {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_updates.push(doc! {
-                "q": { "gstInfo.gstNo": &gst_no },
-                "u": { "$set": { "postgresGst": id} },
-                "multi": true,
+            inv_salt_updates.push(doc! {
+                "q": { "salts": object_id },
+                "u": { "$addToSet": { "postgresSalts": id} },
+                "multi": true
             });
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "gst_registrations",
+                "update": "pharma_salts",
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();
-        }
-        if !ref_updates.is_empty() {
             let command = doc! {
-                "update": "branches",
-                "updates": &ref_updates
+                "update": "inventories",
+                "updates": &inv_salt_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

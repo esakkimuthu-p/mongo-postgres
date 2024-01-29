@@ -24,14 +24,12 @@ impl TdsNatureOfPayment {
             postgres
                 .execute(
                     "INSERT INTO tds_nature_of_payments 
-                    (id,name,display_name,val_name,section,indHufRate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
+                    (id,name,section,indHufRate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
                     OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
                         &d.get_str("section").ok(),
                         &d._get_f64("indHufRate").unwrap_or_default(),
                         &d._get_f64("indHufRateWoPan").unwrap_or_default(),

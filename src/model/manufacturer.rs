@@ -23,14 +23,13 @@ impl Manufacturer {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO manufacturers (id,name,display_name, val_name, mobile, email) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5, $6)",
+                    "INSERT INTO manufacturers (id,name, mobile, email, telephone) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
                         &d.get_str("mobile").ok(),
                         &d.get_str("email").ok(),
+                        &d.get_str("telephone").ok(),
                     ],
                 )
                 .await
@@ -41,7 +40,7 @@ impl Manufacturer {
             });
             inv_updates.push(doc! {
                 "q": { "manufacturerId": object_id },
-                "u": { "$set": { "postgresManuf": id} },
+                "u": { "$set": { "postgresMan": id} },
                 "multi": true,
             });
         }

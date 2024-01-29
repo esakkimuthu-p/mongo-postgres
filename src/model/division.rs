@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct Rack;
+pub struct Division;
 
-impl Rack {
+impl Division {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("racks")
+            .collection::<Document>("inventory_heads")
             .find(
                 doc! {},
                 find_opts(
@@ -23,13 +23,8 @@ impl Rack {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO racks (id,name,display_name, val_name) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4)",
-                    &[
-                        &id,
-                        &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
-                    ],
+                    "INSERT INTO divisions (id,name) OVERRIDING SYSTEM VALUE VALUES ($1, $2)",
+                    &[&id, &d.get_str("name").unwrap()],
                 )
                 .await
                 .unwrap();
@@ -38,15 +33,20 @@ impl Rack {
                 "u": { "$set": { "postgres": id} },
             });
             inv_branch_updates.push(doc! {
-                "q": { "branchDetails": {"$elemMatch": {"rack.id": object_id }} },
-                "u": { "$set": { "branchDetails.$[elm].postgresRack": id} },
-                "multi": true,
-                "arrayFilters": [ { "elm.rack.id": {"$eq":object_id} } ]
+                "q": { "head": object_id },
+                "u": { "$set": { "postgresDiv": id} },
+                "multi": true
             });
+            // inv_branch_updates.push(doc! {
+            //     "q": { "branchDetails": {"$elemMatch": {"rack.id": object_id }} },
+            //     "u": { "$set": { "branchDetails.$[elm].postgresRack": id} },
+            //     "multi": true,
+            //     "arrayFilters": [ { "elm.rack.id": {"$eq":object_id} } ]
+            // });
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "racks",
+                "update": "inventory_heads",
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();

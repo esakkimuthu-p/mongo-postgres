@@ -2,7 +2,6 @@ use super::*;
 
 pub async fn duplicate_fix(db: &Database) {
     for collection in [
-        "racks",
         "accounts",
         "inventories",
         "branches",

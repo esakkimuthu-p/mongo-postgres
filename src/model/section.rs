@@ -24,13 +24,8 @@ impl Section {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO sections (id,name,display_name, val_name) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4)",
-                    &[
-                        &id,
-                        &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
-                    ],
+                    "INSERT INTO sections (id,name) OVERRIDING SYSTEM VALUE VALUES ($1, $2)",
+                    &[&id, &d.get_str("name").unwrap()],
                 )
                 .await
                 .unwrap();

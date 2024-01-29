@@ -31,12 +31,33 @@ impl Account {
             doc! {"q": { "defaultName" : {"$regex":"SGST_RECEIVABLE"}}, "u": {"$set": {"postgres": 9} },"multi": true},
             doc! {"q": { "defaultName" : {"$regex":"IGST_RECEIVABLE"}}, "u": {"$set": {"postgres": 10} },"multi": true},
             doc! {"q": { "defaultName" : {"$regex":"CESS_RECEIVABLE"}}, "u": {"$set": {"postgres": 11} },"multi": true},
+            doc! {"q": { "defaultName" : {"$regex":"ROUNDED_OFF"}}, "u": {"$set": {"postgres": 12} },"multi": true},
+            doc! {"q": { "defaultName" : {"$regex":"DISCOUNT_GIVEN"}}, "u": {"$set": {"postgres": 13} },"multi": true},
+            doc! {"q": { "defaultName" : {"$regex":"DISCOUNT_RECEIVED"}}, "u": {"$set": {"postgres": 14} },"multi": true},
         ];
         let command = doc! {
             "update": "accounts",
             "updates": &updates
         };
         mongodb.run_command(command, None).await.unwrap();
+        mongodb
+            .collection::<Document>("accounts")
+            .update_many(
+                doc! {"accountType": {"$in": ["ACCOUNT_PAYABLE", "TRADE_PAYABLE"]}},
+                doc! {"$set": {"accountType": "SUNDRY_CREDITOR"}},
+                None,
+            )
+            .await
+            .unwrap();
+        mongodb
+            .collection::<Document>("accounts")
+            .update_many(
+                doc! {"accountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}},
+                doc! {"$set": {"accountType": "SUNDRY_DEBTOR"}},
+                None,
+            )
+            .await
+            .unwrap();
 
         for coll in VOUCHER_COLLECTION {
             let mut id = 0;
@@ -87,7 +108,7 @@ impl Account {
             )
             .await
             .unwrap();
-        let mut id: i32 = 11;
+        let mut id: i32 = 14;
         let mut updates = Vec::new();
         let mut ref_updates = Vec::new();
         let mut voucher_ref_updates = Vec::new();
@@ -100,18 +121,17 @@ impl Account {
                 .execute(
                     "INSERT INTO accounts 
                     (
-                        id,name,display_name,val_name,alias_name,val_alias_name,account_type
+                        id,name,alias_name,account_type,gst_tax,sac_code
                     )
                     OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                    VALUES ($1, $2, $3, $4, $5, $6)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
                         &d.get_str("aliasName").ok(),
-                        &d.get_str("aliasName").ok().map(val_name),
                         &d.get_str("accountType").unwrap(),
+                        &d.get_str("tax").ok(),
+                        &d.get_str("sacCode").ok(),
                     ],
                 )
                 .await

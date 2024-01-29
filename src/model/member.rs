@@ -7,7 +7,7 @@ impl Member {
         let mut cur = mongodb
             .collection::<Document>("members")
             .find(
-                doc! {},
+                doc! {"isRoot": false},
                 find_opts(
                     doc! {"createdBy": 0, "createdAt": 0, "updatedAt": 0, "updatedBy": 0},
                     doc! {"isRoot": -1, "_id": 1},
@@ -15,7 +15,7 @@ impl Member {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i32 = 1;
         let mut updates = Vec::new();
         let mut ref_branch_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {

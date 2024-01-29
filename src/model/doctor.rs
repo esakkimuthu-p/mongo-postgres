@@ -23,12 +23,10 @@ impl Doctor {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO doctors (id,name,display_name, val_name, license_no) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5)",
+                    "INSERT INTO doctors (id,name,license_no) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &d.get_str("displayName").unwrap(),
-                        &val_name(d.get_str("name").unwrap()),
                         &d.get_str("licenseNo").ok(),
                     ],
                 )
