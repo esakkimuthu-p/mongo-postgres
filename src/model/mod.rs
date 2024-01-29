@@ -35,11 +35,14 @@ mod manufacturer;
 mod member;
 mod patient;
 mod pharma_salt;
+mod pos_terminal;
 mod print_template;
 mod sale_incharge;
 mod salt;
 mod tds_nature_of_payment;
 mod unit;
+// mod voucher;
+mod voucher_type;
 
 pub use account::Account;
 pub use branch::Branch;
@@ -54,11 +57,14 @@ pub use manufacturer::Manufacturer;
 pub use member::Member;
 pub use patient::Patient;
 pub use pharma_salt::PharmaSalt;
+pub use pos_terminal::PosTerminal;
 pub use print_template::PrintTemplate;
 pub use sale_incharge::SaleIncharge;
 pub use salt::Salt;
 pub use tds_nature_of_payment::TdsNatureOfPayment;
 pub use unit::Unit;
+// pub use voucher::Voucher;
+pub use voucher_type::VoucherType;
 
 pub trait Doc {
     fn get_string(&self, key: &str) -> Option<String>;

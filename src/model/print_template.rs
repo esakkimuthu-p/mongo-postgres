@@ -22,13 +22,15 @@ impl PrintTemplate {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO print_templates (id,name,template,layout,voucher_mode) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5)",
+                    "INSERT INTO print_templates (id,name,template,layout,voucher_mode) 
+                    OVERRIDING SYSTEM VALUE VALUES 
+                    ($1, $2, $3, $4::TEXT::typ_print_layout, $5::TEXT::typ_voucher_mode)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("template").unwrap(),
                         &d.get_str("layout").unwrap(),
-                        &d.get_str("voucherMode").ok(),
+                        &d.get_str("voucherMode").ok().map(|x| &x[0..2]),
                     ],
                 )
                 .await

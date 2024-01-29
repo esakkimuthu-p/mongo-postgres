@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct DesktopClient;
+pub struct PosTerminal;
 
-impl DesktopClient {
+impl PosTerminal {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("desktop_clients")
+            .collection::<Document>("pos_terminals")
             .find(
                 doc! {},
                 find_opts(
@@ -20,21 +20,22 @@ impl DesktopClient {
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
-            let branches = d
-                .get_array("postgresBranches")
-                .unwrap_or(&vec![])
-                .iter()
-                .map(|x| x.as_i32().unwrap())
-                .collect::<Vec<i32>>();
+            let members = d
+                .get_array("postgresmembers")
+                .map(|x| x.iter().map(|x| x.as_i32().unwrap()).collect::<Vec<i32>>())
+                .ok();
             postgres
                 .execute(
-                    "INSERT INTO desktop_clients (id,name,branches,access) 
-                    OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4)",
+                    "INSERT INTO pos_terminals (id,name,pass,branch,members,mode,configuration)
+                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5, $6::TEXT::typ_pos_mode, $7)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &branches,
-                        &d.get_bool("access").ok(),
+                        &d.get_str("password").unwrap(),
+                        &d.get_str("postgresBranch").unwrap(),
+                        &members,
+                        &d.get_str("mode").unwrap(),
+                        &"{}"
                     ],
                 )
                 .await
@@ -46,7 +47,7 @@ impl DesktopClient {
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "desktop_clients",
+                "update": "pos_terminals",
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();

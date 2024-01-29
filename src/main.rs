@@ -56,6 +56,9 @@ async fn main() {
     Salt::create(&mongodb, &client).await;
     Manufacturer::create(&mongodb, &client).await;
     Division::create(&mongodb, &client).await;
+    PosTerminal::create(&mongodb, &client).await;
+    VoucherType::create(&mongodb, &client).await;
+    // Voucher::create(&mongodb, &client).await;
     Unit::create(&mongodb, &client).await;
     Inventory::create(&mongodb, &client).await;
     PharmaSalt::create(&mongodb, &client).await;

@@ -29,7 +29,7 @@ impl Unit {
                         &d.get_str("name").unwrap(), 
                         &d.get_str("uqc").unwrap(), 
                         &d.get_str("symbol").unwrap(), 
-                        &1
+                        &0
                     ],
                 )
                 .await
