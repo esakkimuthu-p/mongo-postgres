@@ -1,3 +1,5 @@
+use mongodb::bson::oid::ObjectId;
+
 use super::*;
 
 pub struct VoucherType;
@@ -25,14 +27,39 @@ impl VoucherType {
             )
             .await
             .unwrap();
-        let mut id: i32 = 20;
+        let members = mongodb
+            .collection::<Document>("members")
+            .find(
+                doc! {},
+                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
+        let mut id: i32 = 100;
+        let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
 
-            let members = d
-                .get_array("postgresMembers")
-                .map(|x| x.iter().map(|x| x.as_i32().unwrap()).collect::<Vec<i32>>())
-                .ok();
+            let mut m_ids = Vec::new();
+            let branch_members = d
+                .get_array("members")
+                .unwrap_or(&vec![])
+                .iter()
+                .map(|x| x.as_object_id().unwrap_or_default())
+                .collect::<Vec<ObjectId>>();
+            for m in branch_members {
+                let mid = members
+                    .iter()
+                    .find_map(|x| {
+                        (x.get_object_id("_id").unwrap() == m)
+                            .then_some(x.get_i32("postgres").unwrap())
+                    })
+                    .unwrap();
+                m_ids.push(mid)
+            }
             let config = match d.get_str("voucherType").unwrap() {
                 "PAYMENT" => {
                     let mut type_id = 1;
@@ -40,16 +67,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-
-                    mongodb
-                        .collection::<Document>("payments")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "payments": {"printAfterSave": false }})
                 }
                 "RECEIPT" => {
@@ -58,15 +79,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-                    mongodb
-                        .collection::<Document>("receipts")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "receipt": {"printAfterSave": false }})
                 }
                 "CONTRA" => {
@@ -75,15 +91,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-                    mongodb
-                        .collection::<Document>("contras")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "contra": {"printAfterSave": false }})
                 }
                 "JOURNAL" => {
@@ -92,15 +103,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-                    mongodb
-                        .collection::<Document>("journals")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "journal": {"printAfterSave": false }})
                 }
                 "SALE" => {
@@ -109,15 +115,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-                    mongodb
-                        .collection::<Document>("sales")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "sale": {"account": {"printAfterSave": false }}})
                 }
                 "CREDIT_NOTE" => {
@@ -126,15 +127,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-                    mongodb
-                        .collection::<Document>("credit_notes")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "credit_note": {"account": {"printAfterSave": false }}})
                 }
                 "PURCHASE" => {
@@ -143,15 +139,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-                    mongodb
-                        .collection::<Document>("purchases")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "purchase": {"account": {"printAfterSave": false }}})
                 }
 
@@ -161,15 +152,10 @@ impl VoucherType {
                         id += 1;
                         type_id = id;
                     }
-                    mongodb
-                        .collection::<Document>("debit_notes")
-                        .update_many(
-                            doc! {"voucherTypeId": object_id},
-                            doc! {"$set": {"postgresVoucherType": type_id}},
-                            None,
-                        )
-                        .await
-                        .unwrap();
+                    updates.push(doc! {
+                        "q": { "_id": object_id },
+                        "u": { "$set": { "postgres": type_id} },
+                    });
                     serde_json::json!({ "debit_note": {"account": {"printAfterSave": false }}})
                 }
                 _ => panic!("Invalid voucherTypes"),
@@ -184,13 +170,18 @@ impl VoucherType {
                         &d.get_str("name").unwrap(),
                         &d.get_str("voucherType").unwrap(),
                         &config,
-                        &members,
+                        &m_ids,
                         &d.get_str("prefix").ok(),
                     ],
                 )
                 .await
                 .unwrap();
             }
+            let command = doc! {
+                "update": "voucher_types",
+                "updates": &updates
+            };
+            mongodb.run_command(command, None).await.unwrap();
         }
     }
 }

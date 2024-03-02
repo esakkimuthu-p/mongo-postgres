@@ -17,7 +17,6 @@ impl Member {
             .unwrap();
         let mut id: i32 = 1;
         let mut updates = Vec::new();
-        let mut ref_branch_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -50,23 +49,15 @@ impl Member {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_branch_updates.push(doc! {
-                "q": { "members": object_id },
-                "u": { "$addToSet": { "postgresMembers": id} },
-                "multi": true
-            });
         }
-        if !updates.is_empty() {
-            let command = doc! {
-                "update": "members",
-                "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "branches",
-                "updates": &ref_branch_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-        }
+        updates.push(doc! {
+            "q": { "isRoot": true },
+            "u": { "$set": { "postgres": 1} },
+        });
+        let command = doc! {
+            "update": "members",
+            "updates": &updates
+        };
+        mongodb.run_command(command, None).await.unwrap();
     }
 }

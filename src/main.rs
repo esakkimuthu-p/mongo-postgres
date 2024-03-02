@@ -42,29 +42,29 @@ async fn main() {
     let mongodb = MongoClient::with_uri_str(args.uri)
         .await
         .unwrap()
-        .database("velavanmed");
-    Member::create(&mongodb, &client).await;
-    FinancialYear::create(&mongodb, &client).await;
-    TdsNatureOfPayment::create(&mongodb, &client).await;
-    Account::map(&mongodb).await;
-    Account::create(&mongodb, &client).await;
-    GstRegistration::create(&mongodb, &client).await;
-    Branch::create(&mongodb, &client).await;
-    Contact::create(&mongodb, &client).await;
-    Doctor::create(&mongodb, &client).await;
-    Patient::create(&mongodb, &client).await;
-    Salt::create(&mongodb, &client).await;
-    Manufacturer::create(&mongodb, &client).await;
-    Division::create(&mongodb, &client).await;
-    PosTerminal::create(&mongodb, &client).await;
-    VoucherType::create(&mongodb, &client).await;
-    // Voucher::create(&mongodb, &client).await;
-    Unit::create(&mongodb, &client).await;
-    Inventory::create(&mongodb, &client).await;
-    PharmaSalt::create(&mongodb, &client).await;
-    SaleIncharge::create(&mongodb, &client).await;
-    PrintTemplate::create(&mongodb, &client).await;
-    DesktopClient::create(&mongodb, &client).await;
+        .database("velavanmed1");
+    // Member::create(&mongodb, &client).await; //ok
+    // FinancialYear::create(&mongodb, &client).await; //ok
+    // TdsNatureOfPayment::create(&mongodb, &client).await;
+    // Account::map(&mongodb).await; // Ok
+    // Account::create(&mongodb, &client).await; // Ok
+    // GstRegistration::create(&mongodb, &client).await; //ok
+    // Branch::create(&mongodb, &client).await; // ok
+    //                                          // Contact::create(&mongodb, &client).await;
+    //                                          // Doctor::create(&mongodb, &client).await;
+    //                                          // Patient::create(&mongodb, &client).await;
+    //                                          // Salt::create(&mongodb, &client).await;
+    //                                          // Manufacturer::create(&mongodb, &client).await;
+    //                                          // Division::create(&mongodb, &client).await;
+    //                                          // PosTerminal::create(&mongodb, &client).await;
+    // VoucherType::create(&mongodb, &client).await; // ok
+    Voucher::create(&mongodb, &client).await;
+    // Unit::create(&mongodb, &client).await;
+    // Inventory::create(&mongodb, &client).await;
+    // PharmaSalt::create(&mongodb, &client).await;
+    // SaleIncharge::create(&mongodb, &client).await;
+    // PrintTemplate::create(&mongodb, &client).await;
+    // DesktopClient::create(&mongodb, &client).await;
 
     println!("Hello, world!");
 }

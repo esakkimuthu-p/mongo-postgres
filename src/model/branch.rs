@@ -1,3 +1,5 @@
+use mongodb::bson::oid::ObjectId;
+
 use super::*;
 
 pub struct Branch;
@@ -17,9 +19,39 @@ impl Branch {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
-        let mut inv_branch_updates = Vec::new();
-        let mut ref_branch_updates = Vec::new();
+        let gst_registrations = mongodb
+            .collection::<Document>("gst_registrations")
+            .find(
+                doc! {},
+                find_opts(doc! {"gstNo": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
+        let accounts = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! {"accountType": "BRANCH_TRANSFER"},
+                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
+        let members = mongodb
+            .collection::<Document>("members")
+            .find(
+                doc! {},
+                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -51,18 +83,47 @@ impl Branch {
                 .get_str("licenseNo")
                 .ok()
                 .map(|x| serde_json::json!({"license_no": x}));
-            let members = d
-                .get_array("postgresMembers")
+            let branch_members = d
+                .get_array("members")
                 .unwrap_or(&vec![])
                 .iter()
-                .map(|x| x.as_i32().unwrap())
-                .collect::<Vec<i32>>();
+                .map(|x| x.as_object_id().unwrap_or_default())
+                .collect::<Vec<ObjectId>>();
+            let mut m_ids = Vec::new();
+            for m in branch_members {
+                let mid = members
+                    .iter()
+                    .find_map(|x| {
+                        (x.get_object_id("_id").unwrap() == m)
+                            .then_some(x.get_i32("postgres").unwrap())
+                    })
+                    .unwrap();
+                m_ids.push(mid)
+            }
+            let gst_registration = gst_registrations
+                .iter()
+                .find_map(|x| {
+                    (x.get_str("gstNo").unwrap()
+                        == d._get_document("gstInfo")
+                            .unwrap()
+                            .get_str("gstNo")
+                            .unwrap())
+                    .then_some(x.get_i32("postgres").unwrap())
+                })
+                .unwrap();
+            let account = accounts
+                .iter()
+                .find_map(|x| {
+                    (x.get_object_id("_id").unwrap() == d.get_object_id("account").unwrap())
+                        .then_some(x.get_i32("postgres").unwrap())
+                })
+                .unwrap();
             postgres
                 .execute(
                     "INSERT INTO branches 
                         (id,name,mobile,alternate_mobile,email,telephone,contact_person,address,
                             city,pincode,state,country, gst_registration, voucher_no_prefix, 
-                            misc, members, account) 
+                            misc, account, members) 
                     OVERRIDING SYSTEM VALUE VALUES 
                         ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
                     &[
@@ -78,11 +139,11 @@ impl Branch {
                         &pincode,
                         &state,
                         &country,
-                        &d.get_i32("postgresGst").unwrap(),
+                        &gst_registration,
                         &d.get_str("voucherNoPrefix").unwrap(),
                         &misc,
-                        &members,
-                        &d.get_i32("postgresAccount").unwrap(),
+                        &account,
+                        &m_ids,
                     ],
                 )
                 .await
@@ -91,95 +152,11 @@ impl Branch {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_updates.push(doc! {
-                "q": { "branch":object_id },
-                "u": { "$set": { "postgresBranch": id} },
-                "multi": true,
-            });
-            // ref_updates2.push(doc! {
-            //     "q": { "altBranch":object_id },
-            //     "u": { "$set": { "postgresAltBranch": id} },
-            //     "multi": true,
-            // });
-            inv_branch_updates.push(doc! {
-                "q": { "branchDetails.branch": object_id  },
-                "u": { "$set": { "branchDetails.$[elm].postgresBranch": id} },
-                "multi": true,
-                "arrayFilters": [ { "elm.branch": {"$eq":object_id} } ]
-            });
-            ref_branch_updates.push(doc! {
-                "q": { "branches": object_id },
-                "u": { "$addToSet": { "postgresBranches": id} },
-                "multi": true
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
                 "update": "branches",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "batches",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "desktop_clients",
-                "updates": &ref_branch_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            for coll in VOUCHER_COLLECTION {
-                let command = doc! {
-                    "update": coll,
-                    "updates": &ref_updates
-                };
-                mongodb.run_command(command, None).await.unwrap();
-            }
-            // let command = doc! {
-            //     "update": "stock_transfers",
-            //     "updates": &ref_updates
-            // };
-            // mongodb.run_command(command, None).await.unwrap();
-
-            // let command = doc! {
-            //     "update": "stock_transfers",
-            //     "updates": &ref_updates2
-            // };
-            // mongodb.run_command(command, None).await.unwrap();
-
-            // let command = doc! {
-            //     "update": "stock_adjustments",
-            //     "updates": &ref_updates
-            // };
-            // mongodb.run_command(command, None).await.unwrap();
-
-            // let command = doc! {
-            //     "update": "material_conversions",
-            //     "updates": &ref_updates
-            // };
-            // mongodb.run_command(command, None).await.unwrap();
-
-            // let command = doc! {
-            //     "update": "manufacturing_journals",
-            //     "updates": &ref_updates
-            // };
-            // mongodb.run_command(command, None).await.unwrap();
-
-            let command = doc! {
-                "update": "account_openings",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-
-            let command = doc! {
-                "update": "inventory_openings",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "inventories",
-                "updates": &inv_branch_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

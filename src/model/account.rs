@@ -1,8 +1,6 @@
-use mongodb::bson::oid::ObjectId;
-
 use super::*;
 
-pub const DEFAULT_NAMES: [&str; 11] = [
+pub const DEFAULT_NAMES: [&str; 15] = [
     "CASH",
     "SALE",
     "PURCHASE",
@@ -14,6 +12,10 @@ pub const DEFAULT_NAMES: [&str; 11] = [
     "SGST_RECEIVABLE",
     "IGST_RECEIVABLE",
     "CESS_RECEIVABLE",
+    "ROUNDED_OFF",
+    "DISCOUNT_GIVEN",
+    "DISCOUNT_RECEIVED",
+    "INVENTORY_ASSET",
 ];
 pub struct Account;
 
@@ -34,6 +36,7 @@ impl Account {
             doc! {"q": { "defaultName" : {"$regex":"ROUNDED_OFF"}}, "u": {"$set": {"postgres": 12} },"multi": true},
             doc! {"q": { "defaultName" : {"$regex":"DISCOUNT_GIVEN"}}, "u": {"$set": {"postgres": 13} },"multi": true},
             doc! {"q": { "defaultName" : {"$regex":"DISCOUNT_RECEIVED"}}, "u": {"$set": {"postgres": 14} },"multi": true},
+            doc! {"q": { "defaultName": "INVENTORY_ASSET"}, "u": {"$set": {"postgres": 16} }},
         ];
         let command = doc! {
             "update": "accounts",
@@ -43,8 +46,8 @@ impl Account {
         mongodb
             .collection::<Document>("accounts")
             .update_many(
-                doc! {"accountType": {"$in": ["ACCOUNT_PAYABLE", "TRADE_PAYABLE"]}},
-                doc! {"$set": {"accountType": "SUNDRY_CREDITOR"}},
+                doc! {},
+                vec![doc! {"$set": {"postgresAccountType": "$accountType"}}],
                 None,
             )
             .await
@@ -52,46 +55,21 @@ impl Account {
         mongodb
             .collection::<Document>("accounts")
             .update_many(
-                doc! {"accountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}},
-                doc! {"$set": {"accountType": "SUNDRY_DEBTOR"}},
+                doc! {"postgresAccountType": {"$in": ["ACCOUNT_PAYABLE", "TRADE_PAYABLE"]}},
+                doc! {"$set": {"postgresAccountType": "SUNDRY_CREDITOR"}},
                 None,
             )
             .await
             .unwrap();
-
-        for coll in VOUCHER_COLLECTION {
-            let mut id = 0;
-            println!("collection {} started", coll);
-            for def_name in DEFAULT_NAMES {
-                println!("default_name {} started", def_name);
-                let acc_ids = mongodb
-                    .collection::<Document>("accounts")
-                    .find(doc! {"defaultName":{"$regex":def_name}}, None)
-                    .await
-                    .unwrap()
-                    .try_collect::<Vec<Document>>()
-                    .await
-                    .unwrap()
-                    .iter()
-                    .map(|x| x.get_object_id("_id").unwrap())
-                    .collect::<Vec<ObjectId>>();
-                let options = UpdateOptions::builder()
-                    .array_filters(vec![doc! { "elm.account": {"$in":acc_ids.clone()} }])
-                    .build();
-                id += 1;
-                mongodb
-                    .collection::<Document>(coll)
-                    .update_many(
-                        doc! {"acTrns.account": {"$in": acc_ids}},
-                        doc! {"$set": { "acTrns.$[elm].postgresAccount": id} },
-                        options,
-                    )
-                    .await
-                    .unwrap();
-                println!("default_name {} ended", def_name);
-            }
-            println!("collection {} end", coll);
-        }
+        mongodb
+            .collection::<Document>("accounts")
+            .update_many(
+                doc! {"postgresAccountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}},
+                doc! {"$set": {"postgresAccountType": "SUNDRY_DEBTOR"}},
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
@@ -108,30 +86,30 @@ impl Account {
             )
             .await
             .unwrap();
-        let mut id: i32 = 14;
+        let mut id: i32 = 100;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
-        let mut voucher_ref_updates = Vec::new();
         let mut parent_ref_updates = Vec::new();
-        let mut contact_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
+            let bill_wise_detail = ["SUNDRY_CREDITOR", "SUNDRY_DEBTOR"]
+                .contains(&d.get_str("postgresAccountType").unwrap());
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
                     "INSERT INTO accounts 
                     (
-                        id,name,alias_name,account_type,gst_tax,sac_code
+                        id,name,alias_name,account_type,gst_tax,sac_code,bill_wise_detail
                     )
                     OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6)",
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("aliasName").ok(),
-                        &d.get_str("accountType").unwrap(),
+                        &d.get_str("postgresAccountType").unwrap(),
                         &d.get_str("tax").ok(),
                         &d.get_str("sacCode").ok(),
+                        &bill_wise_detail,
                     ],
                 )
                 .await
@@ -144,21 +122,6 @@ impl Account {
                 "q": { "parentAccount": object_id },
                 "u": { "$set": { "postgresParent": id} },
                 "multi": true
-            });
-            contact_ref_updates.push(doc! {
-                "q": { "creditAccount": object_id },
-                "u": { "$set": { "postgresCrAcc": id} },
-            });
-            ref_updates.push(doc! {
-                "q": { "account": object_id },
-                "u": { "$set":{"postgresAccount": id }},
-                "multi": true,
-            });
-            voucher_ref_updates.push(doc! {
-                "q": { "acTrns": {"$elemMatch": {"account": object_id }} },
-                "u": { "$set": { "acTrns.$[elm].postgresAccount": id} },
-                "multi": true,
-                "arrayFilters": [ { "elm.account": {"$eq":object_id} } ]
             });
         }
         if !updates.is_empty() {
@@ -173,33 +136,6 @@ impl Account {
                 "updates": &parent_ref_updates
             };
             mongodb.run_command(command, None).await.unwrap();
-
-            let command = doc! {
-                "update": "account_openings",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-
-            let command = doc! {
-                "update": "branches",
-                "updates": &ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "contacts",
-                "updates": &contact_ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-
-            for coll in VOUCHER_COLLECTION {
-                println!("collection {} start", coll);
-                let command = doc! {
-                    "update": coll,
-                    "updates": &voucher_ref_updates
-                };
-                mongodb.run_command(command, None).await.unwrap();
-                println!("collection {} end", coll);
-            }
         }
         let mut cur = mongodb
             .collection::<Document>("accounts")

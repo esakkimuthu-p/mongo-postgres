@@ -8,7 +8,6 @@ use mongodb::{
 };
 use regex::Regex;
 // use tokio_postgres::types::Type;
-use chrono::NaiveDate;
 use tokio_postgres::Client as PostgresClient;
 // use uuid::Uuid;
 pub const VOUCHER_COLLECTION: [&str; 8] = [
@@ -41,7 +40,7 @@ mod sale_incharge;
 mod salt;
 mod tds_nature_of_payment;
 mod unit;
-// mod voucher;
+mod voucher;
 mod voucher_type;
 
 pub use account::Account;
@@ -63,7 +62,7 @@ pub use sale_incharge::SaleIncharge;
 pub use salt::Salt;
 pub use tds_nature_of_payment::TdsNatureOfPayment;
 pub use unit::Unit;
-// pub use voucher::Voucher;
+pub use voucher::Voucher;
 pub use voucher_type::VoucherType;
 
 pub trait Doc {
@@ -107,6 +106,12 @@ fn val_name(name: &str) -> String {
     re.replace_all(name, "").to_lowercase()
 }
 fn find_opts(projection: Document, sort: Document) -> FindOptions {
+    // let mut opt = FindOptions::builder().projection(projection);
+
+    // if let Some(srt) = sort {
+    //     opt.sort(srt);
+    // }
+    // opt.build()
     FindOptions::builder()
         .projection(projection)
         .sort(sort)

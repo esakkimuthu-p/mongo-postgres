@@ -30,7 +30,7 @@ impl GstRegistration {
                     ($1, $2, $3, $4, $5, $6, $7)",
                     &[
                         &id,
-                        &gst_no,
+                        &d.get_str("gstNo").unwrap_or_default(),
                         &"33",
                         &d.get_str("username").ok(),
                         &d.get_str("email").ok(),
@@ -56,8 +56,6 @@ impl GstRegistration {
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();
-        }
-        if !ref_updates.is_empty() {
             let command = doc! {
                 "update": "branches",
                 "updates": &ref_updates

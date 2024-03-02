@@ -11,17 +11,20 @@ impl FinancialYear {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
+        postgres
+            .execute("DELETE FROM financial_years", &[])
+            .await
+            .unwrap();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO financial_years (id,fy_start,fy_end) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3)",
+                    "INSERT INTO financial_years (id,fy_start,fy_end) OVERRIDING SYSTEM VALUE VALUES ($1, $2::TEXT::DATE, $3::TEXT::DATE)",
                     &[
                         &id,
-                        &NaiveDate::from_str(d.get_str("fStart").unwrap()).unwrap(),
-                        &NaiveDate::from_str(d.get_str("fEnd").unwrap()).unwrap(),
+                        &d.get_str("fStart").unwrap(),
+                        &d.get_str("fEnd").unwrap(),
                     ],
                 )
                 .await
@@ -30,23 +33,11 @@ impl FinancialYear {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_updates.push(doc! {
-                "q": { "fYear":  object_id  },
-                "u": { "$set": { "fyPostgres": id} },
-                "multi": true,
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
                 "update": "financial_years",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-        }
-        if !ref_updates.is_empty() {
-            let command = doc! {
-                "update": "voucher_numberings",
-                "updates": &ref_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }
