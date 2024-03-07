@@ -4,6 +4,20 @@ pub struct Contact;
 
 impl Contact {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
+        let accounts = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! {"postgresAccountType": {"$in":["SUNDRY_DEBTOR", "SUNDRY_CREDITOR"]}},
+                find_opts(
+                    doc! {"_id": 1, "postgres": 1, "postgresAccountType": 1},
+                    doc! {"_id": 1},
+                ),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
         let mut cur = mongodb
             .collection::<Document>("contacts")
             .find(
@@ -15,13 +29,12 @@ impl Contact {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
-        let mut updates = Vec::new();
-        let mut cus_ref_updates = Vec::new();
-        let mut ven_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
-            let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
+            let account = accounts.iter().find_map(|x| {
+                (x.get_object_id("_id").unwrap()
+                    == d.get_object_id("creditAccount").unwrap_or_default())
+                .then_some(x.get_i32("postgres").unwrap())
+            });
             let mut mobile = None;
             let mut alternate_mobile = None;
             let mut email = None;
@@ -67,15 +80,15 @@ impl Contact {
                 .execute(
                     &format!(
                         "INSERT INTO {} 
-                        (id,name,short_name,pan_no,aadhar_no,gst_reg_type,gst_location,gst_no,
+                        (name,short_name,pan_no,aadhar_no,gst_reg_type,gst_location,gst_no,
                             mobile,alternate_mobile,email,telephone,contact_person,address,
                             city,pincode,state,country,credit_account, tracking_account) 
-                    OVERRIDING SYSTEM VALUE VALUES 
-                        ($1,$2,$3,$4,$5,$6::TEXT::typ_gst_reg_type,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,20)",
+                    VALUES 
+                        ($1,$2,$3,$4,$5::TEXT::typ_gst_reg_type,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)",
                         table_name
                     ),
                     &[
-                        &id,
+
                         &d.get_str("name").unwrap(),
                         &d.get_str("shortName").ok(),
                         &d.get_str("panNo").ok(),
@@ -93,47 +106,12 @@ impl Contact {
                         &pincode,
                         &state,
                         &country,
-                        &d.get_i32("postgresCrAcc").ok(),
-                        &d.get_i32("postgresCrAcc").ok().is_some(),
+                        &account,
+                        &account.is_some(),
                     ],
                 )
                 .await
                 .unwrap();
-            updates.push(doc! {
-                "q": { "_id": object_id },
-                "u": { "$set": { "postgres": id} },
-            });
-            cus_ref_updates.push(doc! {
-                "q": { "customer":object_id },
-                "u": { "$set": { "postgresContact": id} },
-                "multi": true,
-            });
-            ven_ref_updates.push(doc! {
-                "q": { "vendor":object_id },
-                "u": { "$set": { "postgresContact": id} },
-                "multi": true,
-            });
-        }
-        if !updates.is_empty() {
-            let command = doc! {
-                "update": "contacts",
-                "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            for coll in ["sales", "credit_notes", "patients"] {
-                let command = doc! {
-                    "update": coll,
-                    "updates": &cus_ref_updates
-                };
-                mongodb.run_command(command, None).await.unwrap();
-            }
-            for coll in ["purchases", "debit_notes", "inventories"] {
-                let command = doc! {
-                    "update": coll,
-                    "updates": &ven_ref_updates
-                };
-                mongodb.run_command(command, None).await.unwrap();
-            }
         }
     }
 }

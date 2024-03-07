@@ -1,7 +1,22 @@
-use super::*;
+use std::collections::HashMap;
+
+use serde_json::{json, Value};
 use uuid::Uuid;
 
+use super::*;
+
 pub struct Voucher;
+
+pub const VOUCHER_COLLECTION: [&str; 8] = [
+    "payments",
+    "contras",
+    "receipts",
+    "journals",
+    "purchases",
+    "credit_notes",
+    "debit_notes",
+    "sales",
+];
 
 impl Voucher {
     fn voucher_no(v_no: &str, branch_prefix: &str, fy: &str) -> (String, i32, i32) {
@@ -21,6 +36,22 @@ impl Voucher {
         )
     }
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
+        let gst_taxes = HashMap::from([
+            ("gstna", 0.0),
+            ("gstexempt", 0.0),
+            ("gstngs", 0.0),
+            ("gst0", 0.0),
+            ("gst0p1", 0.1),
+            ("gst0p25", 0.25),
+            ("gst1", 1.0),
+            ("gst1p5", 1.5),
+            ("gst3", 3.0),
+            ("gst5", 5.0),
+            ("gst7p5", 7.5),
+            ("gst12", 12.0),
+            ("gst18", 18.0),
+            ("gst28", 28.0),
+        ]);
         let branches = mongodb
             .collection::<Document>("branches")
             .find(
@@ -68,17 +99,8 @@ impl Voucher {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
-        let _collections = [
-            "payments",
-            "receipts",
-            "contras",
-            "journals",
-            "debit_notes",
-            "credit_notes",
-            "purchases",
-            "sales",
-        ];
-        for collection in ["debit_notes"] {
+
+        for collection in VOUCHER_COLLECTION {
             println!("start {}...", collection);
             let mut cur = mongodb
             .collection::<Document>(collection)
@@ -92,24 +114,42 @@ impl Voucher {
             .await
             .unwrap();
             while let Some(Ok(d)) = cur.next().await {
-                let mut ac_trns: Vec<serde_json::Value> = Vec::new();
-                let trns = d.get_array_document("acTrns").unwrap_or_default();
-                let branch_gst = d._get_document("branchGst").map(|x| {
-                    serde_json::json!({
-                        "reg_type": x.get_str("regType").unwrap(), 
-                        "location": x.get_str("location").unwrap(),
-                        "gst_no": x.get_str("gstNo").unwrap()})
-                });
+                let mut gst_location_type = None;
                 let mut party_gst = None;
-                if let Some(gst) = d._get_document("partyGst") {
-                    if !gst.is_empty() {
-                        party_gst = Some(serde_json::json!({
-                            "reg_type": gst.get_str("regType").unwrap(), 
-                            "location": gst.get_str("location").ok(),
-                            "gst_no": gst.get_str("gstNo").ok()}));
+                let mut branch_gst = None;
+                if let Some(br_gst) = d._get_document("branchGst") {
+                    if !br_gst.is_empty() {
+                        gst_location_type = Some("LOCAL");
+                        branch_gst = Some(json!({
+                            "reg_type": br_gst.get_str("regType").unwrap(), 
+                            "location": br_gst.get_str("location").unwrap(),
+                            "gst_no": br_gst.get_str("gstNo").unwrap()}));
+                    }
+                    if let Some(gst) = d._get_document("partyGst") {
+                        if !gst.is_empty() {
+                            if gst.get_str("location").unwrap_or_default()
+                                != br_gst.get_str("location").unwrap()
+                            {
+                                gst_location_type = Some("INTER_STATE");
+                            }
+                            let reg_type = if gst.get_str("regType").unwrap() == "CONSUMER" {
+                                "UNREGISTERED"
+                            } else if gst.get_str("regType").unwrap() == "OVERSEAS" {
+                                "IMPORT_EXPORT"
+                            } else {
+                                gst.get_str("regType").unwrap()
+                            };
+                            let mut p_gst = json!({
+                                "reg_type": reg_type, 
+                                "location": gst.get_str("location").ok()});
+                            if let Ok(x) = gst.get_str("location") {
+                                p_gst["gst_no"] = json!(x);
+                            }
+                            party_gst = Some(p_gst);
+                        }
                     }
                 }
-                let mut amount = 0.0;
+
                 let (branch, branch_name, branch_prefix) = branches
                     .iter()
                     .find_map(|x| {
@@ -146,11 +186,15 @@ impl Voucher {
                     .unwrap();
                 let voucher_no =
                     Self::voucher_no(&d.get_string("voucherNo").unwrap(), branch_prefix, &fy);
-
+                let mut ac_trns: Vec<Value> = Vec::new();
+                let trns = d.get_array_document("acTrns").unwrap_or_default();
+                let mut amount = 0.0;
                 for trn in trns.clone() {
-                    let mut ba: Vec<serde_json::Value> = Vec::new();
-                    let mut bk: Vec<serde_json::Value> = Vec::new();
-                    amount += trn._get_f64("debit").unwrap();
+                    if trn.get_str("accountType").unwrap() != "STOCK" {
+                        amount += trn._get_f64("debit").unwrap();
+                    }
+                    let mut ba: Vec<Value> = Vec::new();
+                    let mut bk: Vec<Value> = Vec::new();
                     if [
                         "TRADE_PAYABLE",
                         "TRADE_RECEIVABLE",
@@ -159,7 +203,7 @@ impl Voucher {
                     ]
                     .contains(&trn.get_str("accountType").unwrap())
                     {
-                        ba.push(serde_json::json!( {
+                        ba.push(json!({
                             "id": Uuid::new_v4(),
                             "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
                             "ref_type": "ON_ACC",
@@ -195,7 +239,7 @@ impl Voucher {
                                     .then_some(x.get_i32("postgres").unwrap())
                             })
                             .unwrap();
-                        bk.push(serde_json::json!({
+                        bk.push(json!({
                         "id": Uuid::new_v4(),
                         "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
                         "txn_type": "CASH",
@@ -210,25 +254,47 @@ impl Voucher {
                             .then_some(x.get_i32("postgres").unwrap())
                         })
                         .unwrap();
-                    let ac_trn = serde_json::json!({
+                    let mut ac_trn = json!({
                         "id": Uuid::new_v4(),
                         "account": account,
                         "debit": trn._get_f64("debit").unwrap(),
                         "credit": trn._get_f64("credit").unwrap(),
-                        "is_default": trn.get_bool("isDefault").ok(),
-                        // "gst_tax": trn.get_string("tax"),
-                        "taxable_amount": trn._get_f64("taxableAmount"),
-                        "cgst_amount": trn._get_f64("cgstAmount"),
-                        "igst_amount": trn._get_f64("igstAmount"),
-                        "sgst_amount": trn._get_f64("sgstAmount"),
-                        "cess_amount": trn._get_f64("cessAmount"),
-                        "qty": trn._get_f64("qty"),
-                        "bill_allocations": (!ba.is_empty()).then_some(ba),
-                        "bank_allocations": (!bk.is_empty()).then_some(bk),
                     });
+                    if !ba.is_empty() {
+                        ac_trn["bill_allocations"] = json!(ba);
+                    }
+                    if !bk.is_empty() {
+                        ac_trn["bank_allocations"] = json!(bk);
+                    }
+                    if let Ok(x) = trn.get_bool("isDefault") {
+                        ac_trn["is_default"] = json!(x);
+                    }
+                    if let (Some(x), true) = (
+                        trn.get_string("tax"),
+                        (!["GST_RECEIVABLE", "GST_PAYABLE"]
+                            .contains(&trn.get_str("accountType").unwrap())),
+                    ) {
+                        ac_trn["gst_tax"] = json!(x);
+                        ac_trn["qty"] = json!(1.0);
+                        let gst_tax = gst_taxes
+                            .clone()
+                            .into_iter()
+                            .find_map(|y| (y.0 == x).then_some(y.1))
+                            .unwrap();
+                        let taxable =
+                            trn._get_f64("debit").unwrap() + trn._get_f64("credit").unwrap();
+                        if gst_location_type.unwrap_or_default() == "LOCAL" {
+                            ac_trn["sgst_amount"] =
+                                json!(round64(taxable * ((gst_tax / 2.0) / 100.00), 2));
+                            ac_trn["cgst_amount"] =
+                                json!(round64(taxable * ((gst_tax / 2.0) / 100.00), 2));
+                        } else {
+                            ac_trn["igst_amount"] = json!(round64(taxable * (gst_tax / 100.00), 2));
+                        }
+                        ac_trn["taxable_amount"] = json!(taxable);
+                    }
                     ac_trns.push(ac_trn);
                 }
-
                 let desc = format!(
                     "{} OLD-NO: {}",
                     d.get_str("description").unwrap_or_default(),
@@ -255,11 +321,12 @@ impl Voucher {
                         voucher_seq,
                         voucher_no,
                         branch_gst,
-                        party_gst
+                        party_gst,
+                        gst_location_type
                     ) VALUES 
                     ($1::TEXT::DATE, $2::TEXT::DATE, $3, $4, $5::TEXT::typ_voucher_mode, $6, $7, 
                         $8::JSONB, $9, $10, $11, $12, $13::TEXT::typ_base_voucher_type,$14,$15,$16,$17,
-                        $18::JSON, $19::JSON)",
+                        $18::JSON, $19::JSON, $20::TEXT::typ_gst_location_type)",
                     &[
                         &d.get_string("date").unwrap(),
                         &d.get_string("effDate"),
@@ -279,7 +346,8 @@ impl Voucher {
                         &voucher_no.2,
                         &d.get_string("voucherNo").unwrap(),
                         &branch_gst,
-                        &party_gst
+                        &party_gst,
+                        &gst_location_type
                     ],
                 )
                 .await

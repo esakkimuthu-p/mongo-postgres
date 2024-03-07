@@ -15,42 +15,41 @@ impl PosTerminal {
             )
             .await
             .unwrap();
+        let branches = mongodb
+            .collection::<Document>("branches")
+            .find(
+                doc! {},
+                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
         let mut id: i32 = 0;
-        let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
-            let object_id = d.get_object_id("_id").unwrap();
             id += 1;
-            let members = d
-                .get_array("postgresmembers")
-                .map(|x| x.iter().map(|x| x.as_i32().unwrap()).collect::<Vec<i32>>())
-                .ok();
+            let branch = branches
+                .iter()
+                .find_map(|x| {
+                    (x.get_object_id("_id").unwrap() == d.get_object_id("branch").unwrap())
+                        .then_some(x.get_i32("postgres").unwrap())
+                })
+                .unwrap();
             postgres
                 .execute(
-                    "INSERT INTO pos_terminals (id,name,pass,branch,members,mode,configuration)
-                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5, $6::TEXT::typ_pos_mode, $7)",
+                    "INSERT INTO pos_servers (id,name,branch,mode,is_active)
+                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4::TEXT::typ_pos_mode, $5)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
-                        &d.get_str("password").unwrap(),
-                        &d.get_str("postgresBranch").unwrap(),
-                        &members,
+                        &branch,
                         &d.get_str("mode").unwrap(),
-                        &"{}"
+                        &d.get_bool("isActive").unwrap_or(true),
                     ],
                 )
                 .await
                 .unwrap();
-            updates.push(doc! {
-                "q": { "_id": object_id },
-                "u": { "$set": { "postgres": id} },
-            });
-        }
-        if !updates.is_empty() {
-            let command = doc! {
-                "update": "pos_terminals",
-                "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
         }
     }
 }

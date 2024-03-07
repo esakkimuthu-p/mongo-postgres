@@ -1,28 +1,15 @@
-use std::str::FromStr;
-
 use futures_util::{StreamExt, TryStreamExt};
 use mongodb::{
     bson::{doc, Document},
-    options::{FindOptions, UpdateOptions},
+    options::FindOptions,
     Database,
 };
-use regex::Regex;
-// use tokio_postgres::types::Type;
 use tokio_postgres::Client as PostgresClient;
-// use uuid::Uuid;
-pub const VOUCHER_COLLECTION: [&str; 8] = [
-    "payments",
-    "contras",
-    "receipts",
-    "journals",
-    "purchases",
-    "credit_notes",
-    "debit_notes",
-    "sales",
-];
 
 mod account;
+mod account_opening;
 mod branch;
+mod closing_batch;
 mod contact;
 mod desktop_client;
 mod division;
@@ -32,10 +19,7 @@ mod gst_registration;
 mod inventory;
 mod manufacturer;
 mod member;
-mod patient;
-mod pharma_salt;
 mod pos_terminal;
-mod print_template;
 mod sale_incharge;
 mod salt;
 mod tds_nature_of_payment;
@@ -44,7 +28,9 @@ mod voucher;
 mod voucher_type;
 
 pub use account::Account;
+pub use account_opening::AccountOpening;
 pub use branch::Branch;
+pub use closing_batch::InventoryBranchBatch;
 pub use contact::Contact;
 pub use desktop_client::DesktopClient;
 pub use division::Division;
@@ -54,10 +40,7 @@ pub use gst_registration::GstRegistration;
 pub use inventory::Inventory;
 pub use manufacturer::Manufacturer;
 pub use member::Member;
-pub use patient::Patient;
-pub use pharma_salt::PharmaSalt;
 pub use pos_terminal::PosTerminal;
-pub use print_template::PrintTemplate;
 pub use sale_incharge::SaleIncharge;
 pub use salt::Salt;
 pub use tds_nature_of_payment::TdsNatureOfPayment;
@@ -65,10 +48,16 @@ pub use unit::Unit;
 pub use voucher::Voucher;
 pub use voucher_type::VoucherType;
 
+pub fn round64(number: f64, precision: u8) -> f64 {
+    let scale = 10_f64.powi(precision as i32);
+    (number * scale).round() / scale
+}
+
 pub trait Doc {
     fn get_string(&self, key: &str) -> Option<String>;
     fn _get_document(&self, key: &str) -> Option<Document>;
     fn _get_f64(&self, key: &str) -> Option<f64>;
+    fn _get_i32(&self, key: &str) -> Option<i32>;
     fn get_array_document(&self, key: &str) -> Option<Vec<Document>>;
 }
 
@@ -99,12 +88,18 @@ impl Doc for Document {
         }
         None
     }
+    fn _get_i32(&self, key: &str) -> Option<i32> {
+        if let Ok(f) = self.get_i32(key) {
+            return Some(f);
+        } else if let Ok(i) = self.get_i64(key) {
+            return Some(i as i32);
+        } else if let Ok(i) = self.get_f64(key) {
+            return Some(i as i32);
+        }
+        None
+    }
 }
 
-fn val_name(name: &str) -> String {
-    let re = Regex::new("[^a-zA-Z\\d]").unwrap();
-    re.replace_all(name, "").to_lowercase()
-}
 fn find_opts(projection: Document, sort: Document) -> FindOptions {
     // let mut opt = FindOptions::builder().projection(projection);
 

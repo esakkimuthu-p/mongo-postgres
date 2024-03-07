@@ -17,7 +17,6 @@ impl Section {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut inv_updates = Vec::new();
         let mut parent_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
@@ -33,11 +32,6 @@ impl Section {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            inv_updates.push(doc! {
-                "q": { "sectionId": object_id },
-                "u": { "$set": { "postgresSec": id} },
-                "multi": true,
-            });
             parent_ref_updates.push(doc! {
                 "q": { "parentSection": object_id },
                 "u": { "$set": { "postgresParent": id} },
@@ -48,12 +42,6 @@ impl Section {
             let command = doc! {
                 "update": "sections",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-
-            let command = doc! {
-                "update": "inventories",
-                "updates": &inv_updates
             };
             mongodb.run_command(command, None).await.unwrap();
 

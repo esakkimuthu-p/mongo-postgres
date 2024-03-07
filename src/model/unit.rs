@@ -17,19 +17,17 @@ impl Unit {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut inv_unit_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO units (id,name,uqc,symbol,precision) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5::INT::SMALLINT)",
+                    "INSERT INTO units (id,name,uqc,symbol,precision) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, 0)",
                     &[
                         &id, 
                         &d.get_str("name").unwrap(), 
                         &d.get_str("uqc").unwrap(), 
-                        &d.get_str("symbol").unwrap(), 
-                        &0
+                        &d.get_str("symbol").unwrap(),
                     ],
                 )
                 .await
@@ -38,22 +36,11 @@ impl Unit {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            inv_unit_updates.push(doc! {
-                "q": { "units": {"$elemMatch": {"unitId": object_id }} },
-                "u": { "$set": { "units.$[elm].postgresUnit": id} },
-                "multi": true,
-                "arrayFilters": [ { "elm.unitId": {"$eq":object_id} } ]
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
                 "update": "units",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "inventories",
-                "updates": &inv_unit_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

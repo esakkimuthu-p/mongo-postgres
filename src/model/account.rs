@@ -55,7 +55,7 @@ impl Account {
         mongodb
             .collection::<Document>("accounts")
             .update_many(
-                doc! {"postgresAccountType": {"$in": ["ACCOUNT_PAYABLE", "TRADE_PAYABLE"]}},
+                doc! {"accountType": {"$in": ["ACCOUNT_PAYABLE", "TRADE_PAYABLE"]}},
                 doc! {"$set": {"postgresAccountType": "SUNDRY_CREDITOR"}},
                 None,
             )
@@ -64,8 +64,17 @@ impl Account {
         mongodb
             .collection::<Document>("accounts")
             .update_many(
-                doc! {"postgresAccountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}},
+                doc! {"accountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}},
                 doc! {"$set": {"postgresAccountType": "SUNDRY_DEBTOR"}},
+                None,
+            )
+            .await
+            .unwrap();
+        mongodb
+            .collection::<Document>("accounts")
+            .update_many(
+                doc! {"accountType": {"$in": ["GST_PAYABLE", "GST_RECEIVABLE"]}},
+                doc! {"$set": {"postgresAccountType": "DUTIES_AND_TAXES"}},
                 None,
             )
             .await

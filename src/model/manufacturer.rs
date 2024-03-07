@@ -17,7 +17,6 @@ impl Manufacturer {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut inv_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -38,23 +37,11 @@ impl Manufacturer {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            inv_updates.push(doc! {
-                "q": { "manufacturerId": object_id },
-                "u": { "$set": { "postgresMan": id} },
-                "multi": true,
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
                 "update": "manufacturers",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-        }
-        if !inv_updates.is_empty() {
-            let command = doc! {
-                "update": "inventories",
-                "updates": &inv_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

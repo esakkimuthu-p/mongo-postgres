@@ -17,7 +17,6 @@ impl Salt {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut inv_salt_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
@@ -32,21 +31,11 @@ impl Salt {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            inv_salt_updates.push(doc! {
-                "q": { "salts": object_id },
-                "u": { "$addToSet": { "postgresSalts": id} },
-                "multi": true
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
                 "update": "pharma_salts",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-            let command = doc! {
-                "update": "inventories",
-                "updates": &inv_salt_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }

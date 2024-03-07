@@ -17,14 +17,13 @@ impl TdsNatureOfPayment {
             .unwrap();
         let mut id: i32 = 0;
         let mut updates = Vec::new();
-        let mut ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
                     "INSERT INTO tds_nature_of_payments 
-                    (id,name,section,indHufRate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
+                    (id,name,section,ind_huf_rate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
                     OVERRIDING SYSTEM VALUE
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                     &[
@@ -44,23 +43,11 @@ impl TdsNatureOfPayment {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            ref_updates.push(doc! {
-                "q": { "tdsNatureOfPayment": object_id },
-                "u": { "$set":{"postgresTds": id }},
-                "multi": true,
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
                 "update": "tds_nature_of_payments",
                 "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-        }
-        if !ref_updates.is_empty() {
-            let command = doc! {
-                "update": "accounts",
-                "updates": &ref_updates
             };
             mongodb.run_command(command, None).await.unwrap();
         }
