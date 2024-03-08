@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use mongodb::bson::Uuid;
 use serde_json::{json, Value};
-use uuid::Uuid;
 
 use super::*;
 
@@ -204,7 +204,7 @@ impl Voucher {
                     .contains(&trn.get_str("accountType").unwrap())
                     {
                         ba.push(json!({
-                            "id": Uuid::new_v4(),
+                            "id": Uuid::new().to_string(),
                             "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
                             "ref_type": "ON_ACC",
                             "ref_no": d.get_string("refNo"),
@@ -240,7 +240,7 @@ impl Voucher {
                             })
                             .unwrap();
                         bk.push(json!({
-                        "id": Uuid::new_v4(),
+                        "id": Uuid::new().to_string(),
                         "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
                         "txn_type": "CASH",
                         "account": account,
@@ -255,7 +255,7 @@ impl Voucher {
                         })
                         .unwrap();
                     let mut ac_trn = json!({
-                        "id": Uuid::new_v4(),
+                        "id": Uuid::new().to_string(),
                         "account": account,
                         "debit": trn._get_f64("debit").unwrap(),
                         "credit": trn._get_f64("credit").unwrap(),

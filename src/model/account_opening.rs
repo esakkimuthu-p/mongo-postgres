@@ -1,4 +1,4 @@
-use uuid::Uuid;
+use mongodb::bson::Uuid;
 
 use super::*;
 
@@ -63,7 +63,7 @@ impl AccountOpening {
             let mut ba: Vec<serde_json::Value> = Vec::new();
             if ["SUNDRY_CREDITOR", "SUNDRY_DEBTOR"].contains(&account_type) {
                 ba.push(serde_json::json!({
-                    "id": Uuid::new_v4(),
+                    "id": Uuid::new().to_string(),
                     "amount": d._get_f64("debit").unwrap() - d._get_f64("credit").unwrap(),
                     "ref_type": "ON_ACC",
                     "ref_no": "OPENING",

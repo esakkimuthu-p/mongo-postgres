@@ -24,7 +24,7 @@ impl Unit {
                 .execute(
                     "INSERT INTO units (id,name,uqc,symbol,precision) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, 0)",
                     &[
-                        &id, 
+                        &id,
                         &d.get_str("name").unwrap(), 
                         &d.get_str("uqc").unwrap(), 
                         &d.get_str("symbol").unwrap(),

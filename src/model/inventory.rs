@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::*;
 
 pub struct Inventory;
@@ -42,6 +44,17 @@ impl Inventory {
             .find(
                 doc! {},
                 find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
+        let branches = mongodb
+            .collection::<Document>("branches")
+            .find(
+                doc! {},
+                find_opts(doc! {"_id": 1, "postgres": 1, "name": 1}, doc! {"_id": 1}),
             )
             .await
             .unwrap()
@@ -157,6 +170,46 @@ impl Inventory {
                 )
                 .await
                 .unwrap();
+                let mut b_ids = HashSet::new();
+                for br_de in d
+                    .get_array("branchDetails")
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .map(|x| x.as_document().unwrap())
+                {
+                    let branch = branches.iter().find(|x| {
+                        x.get_object_id("_id").unwrap() == br_de.get_object_id("branch").unwrap()
+                    });
+                    if let Some(br) = branch {
+                        let branch_id = br.get_i32("postgres").unwrap();
+                        if b_ids.insert(branch_id) {
+                            let rack = br_de
+                                ._get_document("rack")
+                                .and_then(|x| x.get_string("displayName"));
+                            let s_disc = br_de
+                                ._get_document("sDisc")
+                                .map(|x| serde_json::to_value(x).unwrap());
+                            postgres
+                            .execute(
+                                "INSERT INTO inventory_branch_details 
+                                (inventory,inventory_name, branch, branch_name, inventory_barcodes, rack, s_disc) 
+                                VALUES 
+                                ($1,$2,$3,$4,$5,$6,$7::JSON)",
+                                &[
+                                    &id,
+                                    &name,
+                                    &branch_id,
+                                    &br.get_str("name").unwrap(),
+                                    &barcodes,
+                                    &rack,
+                                    &s_disc
+                                ],
+                            )
+                            .await
+                            .unwrap();
+                        }
+                    }
+                }
                 updates.push(doc! {
                     "q": { "inventory": object_id, "looseQty": loose_qty },
                     "u": { "$set": { "postgres": id} },

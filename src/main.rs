@@ -1,5 +1,4 @@
 use clap::Parser;
-// use gql_client::Client;
 use mongodb::Client as MongoClient;
 use tokio_postgres::NoTls;
 
@@ -43,29 +42,50 @@ async fn main() {
         .await
         .unwrap()
         .database("velavanmed1");
+    println!("Member start..");
     Member::create(&mongodb, &client).await; //ok
+    println!("FinancialYear start..");
     FinancialYear::create(&mongodb, &client).await; //ok
+    println!("TdsNatureOfPayment start..");
     TdsNatureOfPayment::create(&mongodb, &client).await;
+    println!("Account map start..");
     Account::map(&mongodb).await; // Ok
+    println!("Account start..");
     Account::create(&mongodb, &client).await; // Ok
+    println!("GstRegistration start..");
     GstRegistration::create(&mongodb, &client).await; //ok
+    println!("Branch start..");
     Branch::create(&mongodb, &client).await; // ok
+    println!("Customer Vendor start..");
     Contact::create(&mongodb, &client).await; // ok
+    println!("Doctor start..");
     Doctor::create(&mongodb, &client).await; // ok
+    println!("Salt start..");
     Salt::create(&mongodb, &client).await; //ok
+    println!("Manufacturer start..");
     Manufacturer::create(&mongodb, &client).await; //ok
+    println!("Division start..");
     Division::create(&mongodb, &client).await; //ok
+    println!("PosTerminal start..");
     PosTerminal::create(&mongodb, &client).await; // ok
+    println!("VoucherType start..");
     VoucherType::create(&mongodb, &client).await; // ok
+    println!("AccountOpening start..");
     AccountOpening::create(&mongodb, &client).await; // ok
+    println!("Voucher start..");
     Voucher::create(&mongodb, &client).await; //ok
+    println!("Unit start..");
     Unit::create(&mongodb, &client).await; //ok
+    println!("SaleIncharge start..");
     SaleIncharge::create(&mongodb, &client).await; //ok
+    println!("DesktopClient start..");
     DesktopClient::create(&mongodb, &client).await; //ok
-    DesktopClient::create(&mongodb, &client).await; //ok
+    println!("InventoryBranchBatch create start..");
     InventoryBranchBatch::create(&mongodb).await; // ok
+    println!("Inventory opening start..");
     Inventory::create(&mongodb, &client).await;
-    // PrintTemplate::create(&mongodb, &client).await; //later
+    println!("InventoryBranchBatch opening start..");
+    InventoryBranchBatch::opening(&mongodb, &client).await;
 
     println!("Hello, world!");
 }
