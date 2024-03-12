@@ -19,11 +19,19 @@ impl InventoryBranchBatch {
                 doc!{
                     "$project": {
                         "closing": { "$subtract": ["$inward", "$outward"] },
-                        "qty": {"$divide": [ { "$subtract": ["$inward", "$outward"] }, "$unitConv"]},
                         "inventory": 1, "branch": 1, "sRate": 1, "mrp": 1, "pRate": 1,
-                        "looseQty": "$unitConv", 
                         "unit": {"$arrayElemAt": ["$unit.postgres", 0]},
-                        "batchNo": 1, "expiry": 1,"avgNlc": 1
+                        "batchNo": 1, "expiry": 1,"avgNlc": 1,
+                        "qty": {"$cond": [
+                            { "$eq": [{ "$mod": [ { "$subtract": ["$inward", "$outward"] }, "$unitConv"] }, 0] },
+                            {"$divide": [ { "$subtract": ["$inward", "$outward"] }, "$unitConv"]},
+                            { "$subtract": ["$inward", "$outward"] }
+                        ]},
+                        "looseQty": {"$cond": [
+                            { "$eq": [{ "$mod": [ { "$subtract": ["$inward", "$outward"] }, "$unitConv"] }, 0] },
+                            "$unitConv",
+                            1
+                        ]}
                     }
                 },
                 doc!{ "$out": "closing_batches"}
