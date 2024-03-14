@@ -101,16 +101,14 @@ impl Doc for Document {
 }
 
 fn find_opts(projection: Document, sort: Document) -> FindOptions {
-    // let mut opt = FindOptions::builder().projection(projection);
-
-    // if let Some(srt) = sort {
-    //     opt.sort(srt);
-    // }
-    // opt.build()
-    FindOptions::builder()
-        .projection(projection)
-        .sort(sort)
-        .build()
+    if sort.is_empty() {
+        FindOptions::builder().projection(projection).build()
+    } else {
+        FindOptions::builder()
+            .projection(projection)
+            .sort(sort)
+            .build()
+    }
 }
 
 // fn oid_uuid(oid: ObjectId) -> Uuid {

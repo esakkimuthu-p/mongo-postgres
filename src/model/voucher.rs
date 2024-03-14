@@ -58,7 +58,7 @@ impl Voucher {
                 doc! {},
                 find_opts(
                     doc! {"_id": 1, "postgres": 1, "name": 1, "voucherNoPrefix": 1},
-                    doc! {"_id": 1},
+                    doc! {},
                 ),
             )
             .await
@@ -78,10 +78,7 @@ impl Voucher {
             .collection::<Document>("voucher_types")
             .find(
                 doc! {},
-                find_opts(
-                    doc! {"_id": 1, "postgres": 1, "voucherType": 1},
-                    doc! {"_id": 1},
-                ),
+                find_opts(doc! {"_id": 1, "postgres": 1, "voucherType": 1}, doc! {}),
             )
             .await
             .unwrap()
@@ -90,16 +87,30 @@ impl Voucher {
             .unwrap();
         let accounts = mongodb
             .collection::<Document>("accounts")
+            .find(doc! {}, find_opts(doc! {"_id": 1, "postgres": 1}, doc! {}))
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
+        let bank_txns = mongodb
+            .collection::<Document>("bank_transactions")
             .find(
-                doc! {},
-                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+                doc! {"bankDate": {"$exists": true}},
+                find_opts(doc! {"_id": 1, "bankDate": 1}, doc! {}),
             )
             .await
             .unwrap()
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
-
+        postgres
+            .execute(
+                "ALTER TABLE vouchers DISABLE TRIGGER gen_voucher_no_for_vouchers",
+                &[],
+            )
+            .await
+            .unwrap();
         for collection in VOUCHER_COLLECTION {
             println!("start {}...", collection);
             let mut cur = mongodb
@@ -190,6 +201,7 @@ impl Voucher {
                 let trns = d.get_array_document("acTrns").unwrap_or_default();
                 let mut amount = 0.0;
                 for trn in trns.clone() {
+                    let txn_id = trn.get_object_id("_id").unwrap();
                     if trn.get_str("accountType").unwrap() != "STOCK" {
                         amount += trn._get_f64("debit").unwrap();
                     }
@@ -203,12 +215,50 @@ impl Voucher {
                     ]
                     .contains(&trn.get_str("accountType").unwrap())
                     {
-                        ba.push(json!({
-                            "id": Uuid::new().to_string(),
-                            "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
-                            "ref_type": "ON_ACC",
-                            "ref_no": d.get_string("refNo"),
-                        }));
+                        let mut on_acc_val =
+                            trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap();
+                        let allocs = mongodb
+                                .collection::<Document>("bill_allocations")
+                                .find(
+                                    doc! {"txnId": txn_id},
+                                    find_opts(
+                                        doc! {"txnId": 1, "amount": 1, "refNo": 1, "pending": 1, "refType": 1, "_id": 0},
+                                        doc! {},
+                                    ),
+                                )
+                                .await
+                                .unwrap()
+                                .try_collect::<Vec<Document>>()
+                                .await
+                                .unwrap();
+                        for alloc in allocs {
+                            let oid = alloc.get_object_id("pending").unwrap().to_hex();
+                            let pending = format!(
+                                "{}-{}-4{}-{}-{}4444444",
+                                oid[0..8].to_owned(),
+                                oid[8..12].to_owned(),
+                                oid[12..15].to_owned(),
+                                oid[15..19].to_owned(),
+                                oid[19..24].to_owned(),
+                            );
+                            let amount = alloc._get_f64("amount").unwrap();
+                            on_acc_val -= amount;
+                            ba.push(json!({
+                                "id": Uuid::new().to_string(),
+                                "pending": pending,
+                                "amount": amount,
+                                "ref_type": alloc.get_str("refType").unwrap(),
+                                "ref_no": alloc.get_string("refNo").or(d.get_string("refNo")),
+                            }));
+                        }
+                        if round64(on_acc_val, 2) != 0.0 {
+                            ba.push(json!({
+                                "id": Uuid::new().to_string(),
+                                "amount": on_acc_val,
+                                "ref_type": "ON_ACC",
+                                "ref_no": d.get_string("refNo"),
+                            }));
+                        }
                     }
                     if ["BANK_ACCOUNT", "BANK_OD_ACCOUNT"]
                         .contains(&trn.get_str("accountType").unwrap())
@@ -239,12 +289,17 @@ impl Voucher {
                                     .then_some(x.get_i32("postgres").unwrap())
                             })
                             .unwrap();
+                        let bank_date = bank_txns.iter().find_map(|x| {
+                            (x.get_object_id("_id").unwrap() == txn_id)
+                                .then_some(x.get_string("bankDate").unwrap())
+                        });
                         bk.push(json!({
-                        "id": Uuid::new().to_string(),
-                        "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
-                        "txn_type": "CASH",
-                        "account": account,
-                    }));
+                            "id": Uuid::new().to_string(),
+                            "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
+                            "txn_type": "CASH",
+                            "account": account,
+                            "bank_date": bank_date
+                        }));
                     }
                     let account = accounts
                         .iter()
@@ -355,5 +410,12 @@ impl Voucher {
             }
             println!("end {}...", collection);
         }
+        postgres
+            .execute(
+                "ALTER TABLE vouchers ENABLE TRIGGER gen_voucher_no_for_vouchers",
+                &[],
+            )
+            .await
+            .unwrap();
     }
 }
