@@ -12,9 +12,9 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "mongodb://testadmin:rootroot@localhost:27017"
+        default_value = "mongodb://testadmin:rootroot@localhost:27017/velavanmed"
     )]
-    uri: String,
+    mongodb: String,
 
     /// postgres Organization HOST.
     #[clap(
@@ -38,10 +38,11 @@ async fn main() {
         }
     });
 
-    let mongodb = MongoClient::with_uri_str(args.uri)
+    let mongodb = MongoClient::with_uri_str(args.mongodb)
         .await
         .unwrap()
-        .database("velavanmed1");
+        .default_database()
+        .unwrap();
     println!("Member start..");
     Member::create(&mongodb, &client).await; //ok
     println!("FinancialYear start..");
