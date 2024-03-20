@@ -1,5 +1,3 @@
-use mongodb::bson::oid::ObjectId;
-
 use super::*;
 
 pub struct VoucherType;
@@ -27,39 +25,10 @@ impl VoucherType {
             )
             .await
             .unwrap();
-        let members = mongodb
-            .collection::<Document>("members")
-            .find(
-                doc! {},
-                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
-            )
-            .await
-            .unwrap()
-            .try_collect::<Vec<Document>>()
-            .await
-            .unwrap();
         let mut id: i32 = 100;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-
-            let mut m_ids = Vec::new();
-            let branch_members = d
-                .get_array("members")
-                .unwrap_or(&vec![])
-                .iter()
-                .map(|x| x.as_object_id().unwrap_or_default())
-                .collect::<Vec<ObjectId>>();
-            for m in branch_members {
-                let mid = members
-                    .iter()
-                    .find_map(|x| {
-                        (x.get_object_id("_id").unwrap() == m)
-                            .then_some(x.get_i32("postgres").unwrap())
-                    })
-                    .unwrap();
-                m_ids.push(mid)
-            }
             let config = match d.get_str("voucherType").unwrap() {
                 "PAYMENT" => {
                     let mut type_id = 1;
@@ -71,7 +40,7 @@ impl VoucherType {
                         "q": { "_id": object_id },
                         "u": { "$set": { "postgres": type_id} },
                     });
-                    serde_json::json!({ "payments": {"printAfterSave": false }})
+                    serde_json::json!({"payment": {"printAfterSave": false}})
                 }
                 "RECEIPT" => {
                     let mut type_id = 2;
@@ -83,7 +52,7 @@ impl VoucherType {
                         "q": { "_id": object_id },
                         "u": { "$set": { "postgres": type_id} },
                     });
-                    serde_json::json!({ "receipt": {"printAfterSave": false }})
+                    serde_json::json!({"receipt": {"printAfterSave": false}})
                 }
                 "CONTRA" => {
                     let mut type_id = 3;
@@ -119,7 +88,9 @@ impl VoucherType {
                         "q": { "_id": object_id },
                         "u": { "$set": { "postgres": type_id} },
                     });
-                    serde_json::json!({ "sale": {"account": {"printAfterSave": false }}})
+                    serde_json::json!(
+                        {"sale": {"account": {"printAfterSave": false}, "inventory": {"hideRack": false, "taxEditable": false, "rateEditable": false, "unitEditable": false, "printTemplate": {"enableSilentPrintMode": false}, "setDefaultQty": false, "barcodeEnabled": false, "printAfterSave": false, "autoSelectBatch": false, "defaultPriceList": null, "discountEditable": false, "warehouseEnabled": false, "priceListEditable": false, "enableSaleIncharge": false, "allowCreditCustomer": false, "cashRegisterEnabled": false, "hideMrpInBatchModal": false, "setFocusOnInventory": false, "billDiscountEditable": false, "allowedCreditAccounts": null, "customerFormQuickCreate": false, "voucherwiseSaleIncharge": false, "freezeSaleInchargeForVoucher": false}}}
+                    )
                 }
                 "CREDIT_NOTE" => {
                     let mut type_id = 6;
@@ -131,7 +102,9 @@ impl VoucherType {
                         "q": { "_id": object_id },
                         "u": { "$set": { "postgres": type_id} },
                     });
-                    serde_json::json!({ "credit_note": {"account": {"printAfterSave": false }}})
+                    serde_json::json!(
+                        {"creditNote": {"account": {"printAfterSave": false}, "inventory": {"enableExp": false, "taxEditable": false, "rateEditable": false, "unitEditable": false, "printTemplate": { "enableSilentPrintMode": false}, "barcodeEnabled": false, "printAfterSave": false, "discountEditable": false, "warehouseEnabled": false, "invoiceNoRequired": false, "enableSaleIncharge": false, "allowCreditCustomer": false, "cashRegisterEnabled": false, "billDiscountEditable": false, "customerFormQuickCreate": false, "voucherwiseSaleIncharge": false, "freezeSaleInchargeForVoucher": false}}}
+                    )
                 }
                 "PURCHASE" => {
                     let mut type_id = 7;
@@ -143,7 +116,9 @@ impl VoucherType {
                         "q": { "_id": object_id },
                         "u": { "$set": { "postgres": type_id} },
                     });
-                    serde_json::json!({ "purchase": {"account": {"printAfterSave": false }}})
+                    serde_json::json!(
+                        {"purchase": {"account": {"printAfterSave": false}, "inventory": {"taxHide": false, "enableGin": false, "sRateAsMrp": false, "preventLoss": false, "printTemplate": { "enableSilentPrintMode": false}, "barcodeEnabled": false, "printAfterSave": false, "sRateMrpRequired": false, "allowCreditVendor": false}}}
+                    )
                 }
 
                 "DEBIT_NOTE" => {
@@ -156,21 +131,22 @@ impl VoucherType {
                         "q": { "_id": object_id },
                         "u": { "$set": { "postgres": type_id} },
                     });
-                    serde_json::json!({ "debit_note": {"account": {"printAfterSave": false }}})
+                    serde_json::json!(
+                        {"debitNote": {"account": {"printAfterSave": false}, "inventory": {"enableExp": false, "taxEditable": false, "rateEditable": false, "printTemplate": {"enableSilentPrintMode": false}, "barcodeEnabled": false, "billNoRequired": false, "printAfterSave": false, "discountEditable": false, "warehouseEnabled": false, "allowCreditVendor": false, "cashRegisterEnabled": false}}}
+                    )
                 }
                 _ => panic!("Invalid voucherTypes"),
             };
             if !d.get_bool("default").unwrap_or_default() {
                 postgres
                 .execute(
-                    "INSERT INTO voucher_types (id, name, base_type, config, members, prefix)
-                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3::TEXT::typ_base_voucher_type, $4, $5, $6)",
+                    "INSERT INTO voucher_types (id, name, base_type, config, prefix)
+                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3::TEXT::typ_base_voucher_type, $4::json, $5)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("voucherType").unwrap(),
                         &config,
-                        &m_ids,
                         &d.get_str("prefix").ok(),
                     ],
                 )

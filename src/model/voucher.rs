@@ -77,7 +77,7 @@ impl Voucher {
         let voucher_types = mongodb
             .collection::<Document>("voucher_types")
             .find(
-                doc! {},
+                doc! {"postgres": {"$exists": true}},
                 find_opts(doc! {"_id": 1, "postgres": 1, "voucherType": 1}, doc! {}),
             )
             .await
@@ -190,7 +190,7 @@ impl Voucher {
                         (x.get_object_id("_id").unwrap()
                             == d.get_object_id("voucherTypeId").unwrap())
                         .then_some((
-                            x.get_i32("postgres").unwrap(),
+                            x._get_i32("postgres").unwrap(),
                             x.get_str("voucherType").unwrap(),
                         ))
                     })
@@ -273,15 +273,14 @@ impl Voucher {
                             .contains(&x.get_str("accountType").unwrap()))
                             .then_some(x.get_object_id("account").unwrap())
                         });
-                        let except_bk_account = &trns
-                            .iter()
-                            .find_map(|x| {
-                                (!["BANK_ACCOUNT", "BANK_OD_ACCOUNT"]
-                                    .contains(&x.get_str("accountType").unwrap()))
-                                .then_some(x.get_object_id("account").unwrap())
-                            })
-                            .unwrap();
-                        let account = sundry_account.unwrap_or(*except_bk_account);
+                        let except_bk_account = &trns.iter().find_map(|x| {
+                            (!["BANK_ACCOUNT", "BANK_OD_ACCOUNT"]
+                                .contains(&x.get_str("accountType").unwrap()))
+                            .then_some(x.get_object_id("account").unwrap())
+                        });
+                        let first_acc = &trns.first().unwrap().get_object_id("account").unwrap();
+                        let account =
+                            sundry_account.unwrap_or((*except_bk_account).unwrap_or(*first_acc));
                         let account = accounts
                             .iter()
                             .find_map(|x| {
@@ -387,7 +386,7 @@ impl Voucher {
                         &d.get_string("effDate"),
                         &branch,
                         &voucher_type,
-                        &"ACC",
+                        &"ACCOUNT",
                         &d.get_string("refNo"),
                         &desc,
                         &serde_json::to_value(ac_trns).unwrap(),

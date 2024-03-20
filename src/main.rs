@@ -12,7 +12,7 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "mongodb://testadmin:rootroot@localhost:27017/velavanmed"
+        default_value = "mongodb://testadmin:rootroot@localhost:27017/ttgold"
     )]
     mongodb: String,
 
@@ -20,7 +20,7 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/velavanmed"
+        default_value = "postgresql://postgres:1@localhost:5432/ttgoldpalace"
     )]
     postgres: String,
 }
@@ -43,6 +43,7 @@ async fn main() {
         .unwrap()
         .default_database()
         .unwrap();
+    println!("START***{}****", &mongodb.name());
     println!("Member start..");
     Member::create(&mongodb, &client).await; //ok
     println!("FinancialYear start..");
@@ -88,5 +89,5 @@ async fn main() {
     println!("InventoryBranchBatch opening start..");
     InventoryBranchBatch::opening(&mongodb, &client).await;
 
-    println!("Hello, world!");
+    println!("END***{}****", &mongodb.name());
 }
