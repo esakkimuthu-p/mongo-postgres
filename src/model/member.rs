@@ -20,16 +20,16 @@ impl Member {
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
-            let perms = d
-                .get_array("permissions")
-                .unwrap_or(&vec![])
-                .iter()
-                .map(|x| x.as_str().unwrap().to_lowercase())
-                .collect::<Vec<String>>();
+            // let perms = d
+            //     .get_array("permissions")
+            //     .unwrap_or(&vec![])
+            //     .iter()
+            //     .map(|x| x.as_str().unwrap().to_lowercase())
+            //     .collect::<Vec<String>>();
             postgres
                 .execute(
                     "INSERT INTO members 
-                        (id,name,user_id, pass,nick_name,remote_access, is_root, perms)
+                        (id,name,user_id, pass,nick_name,remote_access, is_root)
                     OVERRIDING SYSTEM VALUE
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                     &[
@@ -40,7 +40,6 @@ impl Member {
                         &d.get_str("nickName").ok(),
                         &d.get_bool("remoteAccess").unwrap_or_default(),
                         &d.get_bool("isRoot").unwrap_or_default(),
-                        &(!perms.is_empty()).then_some(perms),
                     ],
                 )
                 .await
