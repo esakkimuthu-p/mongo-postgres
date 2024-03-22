@@ -64,6 +64,15 @@ impl Account {
         mongodb
             .collection::<Document>("accounts")
             .update_many(
+                doc! {"accountType": "BRANCH_TRANSFER"},
+                doc! {"$set": {"postgresAccountType": "BRANCH_OR_DIVISION"}},
+                None,
+            )
+            .await
+            .unwrap();
+        mongodb
+            .collection::<Document>("accounts")
+            .update_many(
                 doc! {"accountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}},
                 doc! {"$set": {"postgresAccountType": "SUNDRY_DEBTOR"}},
                 None,

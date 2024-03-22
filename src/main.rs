@@ -9,11 +9,7 @@ use model::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// mongodb Organization cluster MONGO-URI.
-    #[clap(
-        short,
-        long,
-        default_value = "mongodb://testadmin:rootroot@localhost:27017/ttgold"
-    )]
+    #[clap(short, long, default_value = "mongodb://192.168.1.50:27017/ttgold2")]
     mongodb: String,
 
     /// postgres Organization HOST.
@@ -62,8 +58,6 @@ async fn main() {
     Contact::create(&mongodb, &client).await; // ok
     println!("Doctor start..");
     Doctor::create(&mongodb, &client).await; // ok
-    println!("Salt start..");
-    Salt::create(&mongodb, &client).await; //ok
     println!("Manufacturer start..");
     Manufacturer::create(&mongodb, &client).await; //ok
     println!("Division start..");
@@ -88,6 +82,7 @@ async fn main() {
     Inventory::create(&mongodb, &client).await;
     println!("InventoryBranchBatch opening start..");
     InventoryBranchBatch::opening(&mongodb, &client).await;
-
+    println!("VoucherNumSequence start..");
+    VoucherNumSequence::create(&mongodb, &client).await; //ok
     println!("END***{}****", &mongodb.name());
 }

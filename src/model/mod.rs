@@ -21,10 +21,10 @@ mod manufacturer;
 mod member;
 mod pos_terminal;
 mod sale_incharge;
-mod salt;
 mod tds_nature_of_payment;
 mod unit;
 mod voucher;
+mod voucher_num_seq;
 mod voucher_type;
 
 pub use account::Account;
@@ -42,10 +42,10 @@ pub use manufacturer::Manufacturer;
 pub use member::Member;
 pub use pos_terminal::PosTerminal;
 pub use sale_incharge::SaleIncharge;
-pub use salt::Salt;
 pub use tds_nature_of_payment::TdsNatureOfPayment;
 pub use unit::Unit;
 pub use voucher::Voucher;
+pub use voucher_num_seq::VoucherNumSequence;
 pub use voucher_type::VoucherType;
 
 pub fn round64(number: f64, precision: u8) -> f64 {

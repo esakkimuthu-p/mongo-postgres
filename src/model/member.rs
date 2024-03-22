@@ -20,12 +20,6 @@ impl Member {
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
-            // let perms = d
-            //     .get_array("permissions")
-            //     .unwrap_or(&vec![])
-            //     .iter()
-            //     .map(|x| x.as_str().unwrap().to_lowercase())
-            //     .collect::<Vec<String>>();
             postgres
                 .execute(
                     "INSERT INTO members 
