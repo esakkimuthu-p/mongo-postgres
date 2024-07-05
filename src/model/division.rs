@@ -15,14 +15,14 @@ impl Division {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO divisions (id,name) OVERRIDING SYSTEM VALUE VALUES ($1, $2)",
+                    "INSERT INTO division (id,name) OVERRIDING SYSTEM VALUE VALUES ($1, $2)",
                     &[&id, &d.get_str("name").unwrap()],
                 )
                 .await

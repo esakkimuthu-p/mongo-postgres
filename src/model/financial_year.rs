@@ -9,10 +9,10 @@ impl FinancialYear {
             .find(doc! {}, None)
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         postgres
-            .execute("DELETE FROM financial_years", &[])
+            .execute("DELETE FROM financial_year", &[])
             .await
             .unwrap();
         while let Some(Ok(d)) = cur.next().await {
@@ -20,7 +20,7 @@ impl FinancialYear {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO financial_years (id,fy_start,fy_end) OVERRIDING SYSTEM VALUE VALUES ($1, $2::TEXT::DATE, $3::TEXT::DATE)",
+                    "INSERT INTO financial_year (id,fy_start,fy_end) OVERRIDING SYSTEM VALUE VALUES ($1, $2::TEXT::DATE, $3::TEXT::DATE)",
                     &[
                         &id,
                         &d.get_str("fStart").unwrap(),

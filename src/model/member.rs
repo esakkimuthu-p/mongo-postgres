@@ -15,14 +15,14 @@ impl Member {
             )
             .await
             .unwrap();
-        let mut id: i32 = 1;
+        let mut id: i64 = 1;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO members 
+                    "INSERT INTO member
                         (id,name,user_id, pass,nick_name,remote_access, is_root)
                     OVERRIDING SYSTEM VALUE
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",

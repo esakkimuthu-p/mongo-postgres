@@ -25,7 +25,7 @@ impl VoucherType {
             )
             .await
             .unwrap();
-        let mut id: i32 = 100;
+        let mut id: i64 = 100;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
@@ -139,19 +139,19 @@ impl VoucherType {
             };
             if !d.get_bool("default").unwrap_or_default() {
                 postgres
-                .execute(
-                    "INSERT INTO voucher_types (id, name, base_type, config, prefix)
-                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3::TEXT::typ_base_voucher_type, $4::json, $5)",
-                    &[
-                        &id,
-                        &d.get_str("name").unwrap(),
-                        &d.get_str("voucherType").unwrap(),
-                        &config,
-                        &d.get_str("prefix").ok(),
-                    ],
-                )
-                .await
-                .unwrap();
+                    .execute(
+                        "INSERT INTO voucher_type (id, name, base_type, config, prefix)
+                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4::json, $5)",
+                        &[
+                            &id,
+                            &d.get_str("name").unwrap(),
+                            &d.get_str("voucherType").unwrap(),
+                            &config,
+                            &d.get_str("prefix").ok(),
+                        ],
+                    )
+                    .await
+                    .unwrap();
             }
             let command = doc! {
                 "update": "voucher_types",

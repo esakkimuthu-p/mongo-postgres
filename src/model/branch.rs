@@ -17,7 +17,7 @@ impl Branch {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         let gst_registrations = mongodb
             .collection::<Document>("gst_registrations")
@@ -95,7 +95,7 @@ impl Branch {
                     .iter()
                     .find_map(|x| {
                         (x.get_object_id("_id").unwrap() == m)
-                            .then_some(x.get_i32("postgres").unwrap())
+                            .then_some(x._get_i32("postgres").unwrap())
                     })
                     .unwrap();
                 m_ids.push(mid)
@@ -108,22 +108,22 @@ impl Branch {
                             .unwrap()
                             .get_str("gstNo")
                             .unwrap())
-                    .then_some(x.get_i32("postgres").unwrap())
+                    .then_some(x._get_i32("postgres").unwrap())
                 })
                 .unwrap();
             let account = accounts
                 .iter()
                 .find_map(|x| {
                     (x.get_object_id("_id").unwrap() == d.get_object_id("account").unwrap())
-                        .then_some(x.get_i32("postgres").unwrap())
+                        .then_some(x._get_i32("postgres").unwrap())
                 })
                 .unwrap();
             postgres
                 .execute(
-                    "INSERT INTO branches 
+                    "INSERT INTO branch 
                         (id,name,mobile,alternate_mobile,email,telephone,contact_person,address,
-                            city,pincode,state,country, gst_registration, voucher_no_prefix, 
-                            misc, account, members) 
+                            city,pincode,state_id,country_id, gst_registration_id, voucher_no_prefix, 
+                            misc, account_id, members) 
                     OVERRIDING SYSTEM VALUE VALUES 
                         ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
                     &[

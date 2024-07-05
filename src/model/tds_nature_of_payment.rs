@@ -15,14 +15,14 @@ impl TdsNatureOfPayment {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO tds_nature_of_payments 
+                    "INSERT INTO tds_nature_of_payment 
                     (id,name,section,ind_huf_rate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
                     OVERRIDING SYSTEM VALUE
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",

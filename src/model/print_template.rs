@@ -15,16 +15,16 @@ impl PrintTemplate {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO print_templates (id,name,template,layout,voucher_mode) 
+                    "INSERT INTO print_template (id,name,template,layout,voucher_mode) 
                     OVERRIDING SYSTEM VALUE VALUES 
-                    ($1, $2, $3, $4::TEXT::typ_print_layout, $5::TEXT::typ_voucher_mode)",
+                    ($1, $2, $3, $4, $5)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),

@@ -103,7 +103,7 @@ impl InventoryBranchBatch {
                 .iter()
                 .find_map(|x| {
                     (x.get_object_id("_id").unwrap() == d.get_object_id("branch").unwrap())
-                        .then_some(x.get_i32("postgres").unwrap())
+                        .then_some(x._get_i32("postgres").unwrap())
                 })
                 .unwrap();
             let mut trns = d
@@ -118,10 +118,10 @@ impl InventoryBranchBatch {
             postgres
                 .execute(
                     "INSERT INTO inventory_openings
-                        (inventory,branch,inv_trns)
+                        (inventory_id,branch_id,inv_items)
                     VALUES ($1, $2, $3::JSONB)",
                     &[
-                        &d.get_i32("inventory").unwrap(),
+                        &d._get_i32("inventory").unwrap(),
                         &branch,
                         &serde_json::to_value(trns).unwrap(),
                     ],

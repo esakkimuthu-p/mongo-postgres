@@ -18,7 +18,7 @@ impl Doctor {
         while let Some(Ok(d)) = cur.next().await {
             postgres
                 .execute(
-                    "INSERT INTO doctors (name,license_no) VALUES ($1, $2)",
+                    "INSERT INTO doctor (name,license_no) VALUES ($1, $2)",
                     &[&d.get_str("name").unwrap(), &d.get_str("licenseNo").ok()],
                 )
                 .await

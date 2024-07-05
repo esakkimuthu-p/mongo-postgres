@@ -15,7 +15,7 @@ impl GstRegistration {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         let mut ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
@@ -24,8 +24,8 @@ impl GstRegistration {
             id += 1;
             postgres
                 .execute(
-                    "INSERT INTO gst_registrations 
-                    (id, gst_no, state, username,email,e_invoice_username, e_password) 
+                    "INSERT INTO gst_registration 
+                    (id, gst_no, state_id, username,email,e_invoice_username, e_password) 
                     OVERRIDING SYSTEM VALUE VALUES 
                     ($1, $2, $3, $4, $5, $6, $7)",
                     &[

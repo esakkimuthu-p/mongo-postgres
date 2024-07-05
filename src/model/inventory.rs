@@ -72,7 +72,7 @@ impl Inventory {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
@@ -81,7 +81,7 @@ impl Inventory {
                 .iter()
                 .find_map(|x| {
                     (x.get_object_id("_id").unwrap() == d.get_object_id("head").unwrap())
-                        .then_some(x.get_i32("postgres").unwrap())
+                        .then_some(x._get_i32("postgres").unwrap())
                 })
                 .unwrap();
             let mut cess = None;
@@ -106,7 +106,7 @@ impl Inventory {
                     .iter()
                     .find_map(|x| {
                         (x.get_object_id("_id").unwrap() == b.as_object_id().unwrap())
-                            .then_some(x.get_i32("postgres").unwrap())
+                            .then_some(x._get_i32("postgres").unwrap())
                     })
                     .unwrap();
                 salts.push(s);
@@ -116,7 +116,7 @@ impl Inventory {
             if let Ok(id) = d.get_object_id("manufacturerId") {
                 manufacturer = manufacturers.iter().find_map(|x| {
                     (x.get_object_id("_id").unwrap() == id)
-                        .then_some(x.get_i32("postgres").unwrap())
+                        .then_some(x._get_i32("postgres").unwrap())
                 });
                 manufacturer_name = d.get_str("manufacturerName").ok();
             }
@@ -128,7 +128,10 @@ impl Inventory {
                     .iter()
                     .find_map(|x| {
                         (x.get_object_id("_id").unwrap() == u.get_object_id("unitId").unwrap())
-                            .then_some((x.get_i32("postgres").unwrap(), x.get_str("name").unwrap()))
+                            .then_some((
+                                x._get_i32("postgres").unwrap(),
+                                x.get_str("name").unwrap(),
+                            ))
                     })
                     .unwrap();
                 if loose_qty != 1 {
@@ -136,7 +139,7 @@ impl Inventory {
                 }
                 postgres
                 .execute(
-                    "INSERT INTO inventories 
+                    "INSERT INTO inventory 
                     (id,name, division, allow_negative_stock, gst_tax, unit, sale_unit, purchase_unit,cess,
                         purchase_config,sale_config, barcodes,hsn_code, description, manufacturer, manufacturer_name, 
                         salts, schedule_h, schedule_h1, narcotics, enable_expiry,loose_qty
@@ -181,7 +184,7 @@ impl Inventory {
                         x.get_object_id("_id").unwrap() == br_de.get_object_id("branch").unwrap()
                     });
                     if let Some(br) = branch {
-                        let branch_id = br.get_i32("postgres").unwrap();
+                        let branch_id = br._get_i32("postgres").unwrap();
                         if b_ids.insert(branch_id) {
                             let rack = br_de
                                 ._get_document("rack")
@@ -191,7 +194,7 @@ impl Inventory {
                                 .map(|x| serde_json::to_value(x).unwrap());
                             postgres
                             .execute(
-                                "INSERT INTO inventory_branch_details 
+                                "INSERT INTO inventory_branch_detail 
                                 (inventory,inventory_name, branch, branch_name, inventory_barcodes, rack, s_disc) 
                                 VALUES 
                                 ($1,$2,$3,$4,$5,$6,$7::JSON)",

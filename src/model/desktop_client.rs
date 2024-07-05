@@ -41,14 +41,14 @@ impl DesktopClient {
                     .iter()
                     .find_map(|y| {
                         (y.get_object_id("_id").unwrap() == x)
-                            .then_some(y.get_i32("postgres").unwrap())
+                            .then_some(y._get_i32("postgres").unwrap())
                     })
                     .unwrap();
                 br_ids.push(br);
             }
             postgres
                 .execute(
-                    "INSERT INTO desktop_clients (name,branches,access) 
+                    "INSERT INTO desktop_client (name,branches,access) 
                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3)",
                     &[
                         &d.get_str("name").unwrap(),

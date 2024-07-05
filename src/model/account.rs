@@ -37,57 +37,34 @@ impl Account {
             doc! {"q": { "defaultName" : {"$regex":"DISCOUNT_GIVEN"}}, "u": {"$set": {"postgres": 13} },"multi": true},
             doc! {"q": { "defaultName" : {"$regex":"DISCOUNT_RECEIVED"}}, "u": {"$set": {"postgres": 14} },"multi": true},
             doc! {"q": { "defaultName": "INVENTORY_ASSET"}, "u": {"$set": {"postgres": 16} }},
+            doc! {"q": { "accountType": "CURRENT_ASSET"}, "u": {"$set": {"postgresAccountType": 1} }, "multi": true},
+            doc! {"q": { "accountType": "CURRENT_LIABILITY"}, "u": {"$set": {"postgresAccountType": 2} }, "multi": true},
+            doc! {"q": { "accountType": "DIRECT_INCOME"}, "u": {"$set": {"postgresAccountType": 3} }, "multi": true},
+            doc! {"q": { "accountType": "INDIRECT_INCOME"}, "u": {"$set": {"postgresAccountType": 4} }, "multi": true},
+            doc! {"q": { "accountType": "SALE"}, "u": {"$set": {"postgresAccountType": 5} }, "multi": true},
+            doc! {"q": { "accountType": "DIRECT_EXPENSE"}, "u": {"$set": {"postgresAccountType": 6} }, "multi": true},
+            doc! {"q": { "accountType": "INDIRECT_EXPENSE"}, "u": {"$set": {"postgresAccountType": 7} }, "multi": true},
+            doc! {"q": { "accountType": "PURCHASE"}, "u": {"$set": {"postgresAccountType": 8} }, "multi": true},
+            doc! {"q": { "accountType": "FIXED_ASSET"}, "u": {"$set": {"postgresAccountType": 9} }, "multi": true},
+            doc! {"q": { "accountType": "LONGTERM_LIABILITY"}, "u": {"$set": {"postgresAccountType": 10} }, "multi": true},
+            doc! {"q": { "accountType": "EQUITY"}, "u": {"$set": {"postgresAccountType": 11} }, "multi": true},
+            doc! {"q": { "accountType": "STOCK"}, "u": {"$set": {"postgresAccountType": 12} }, "multi": true},
+            doc! {"q": { "accountType": "BANK_ACCOUNT"}, "u": {"$set": {"postgresAccountType": 13} }, "multi": true},
+            doc! {"q": { "accountType": "EFT_ACCOUNT"}, "u": {"$set": {"postgresAccountType": 14} }, "multi": true},
+            doc! {"q": { "accountType": "TDS_RECEIVABLE"}, "u": {"$set": {"postgresAccountType": 15} }, "multi": true},
+            doc! {"q": { "accountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}}, "u": {"$set": {"postgresAccountType": 16} }, "multi": true},
+            doc! {"q": { "accountType": "CASH"}, "u": {"$set": {"postgresAccountType": 17} }, "multi": true},
+            doc! {"q": { "accountType": "BANK_OD_ACCOUNT"}, "u": {"$set": {"postgresAccountType": 18} }, "multi": true},
+            doc! {"q": { "accountType": {"$in": ["ACCOUNT_PAYABLE", "TRADE_PAYABLE"]}}, "u": {"$set": {"postgresAccountType": 19} }, "multi": true},
+            doc! {"q": { "accountType": "BRANCH_TRANSFER"}, "u": {"$set": {"postgresAccountType": 20} }, "multi": true},
+            doc! {"q": { "accountType": "TDS_PAYABLE"}, "u": {"$set": {"postgresAccountType": 21} }, "multi": true},
+            doc! {"q": { "accountType": {"$in": ["GST_PAYABLE", "GST_RECEIVABLE"]}}, "u": {"$set": {"postgresAccountType": 22} }, "multi": true},
         ];
         let command = doc! {
             "update": "accounts",
             "updates": &updates
         };
         mongodb.run_command(command, None).await.unwrap();
-        mongodb
-            .collection::<Document>("accounts")
-            .update_many(
-                doc! {},
-                vec![doc! {"$set": {"postgresAccountType": "$accountType"}}],
-                None,
-            )
-            .await
-            .unwrap();
-        mongodb
-            .collection::<Document>("accounts")
-            .update_many(
-                doc! {"accountType": {"$in": ["ACCOUNT_PAYABLE", "TRADE_PAYABLE"]}},
-                doc! {"$set": {"postgresAccountType": "SUNDRY_CREDITOR"}},
-                None,
-            )
-            .await
-            .unwrap();
-        mongodb
-            .collection::<Document>("accounts")
-            .update_many(
-                doc! {"accountType": "BRANCH_TRANSFER"},
-                doc! {"$set": {"postgresAccountType": "BRANCH_OR_DIVISION"}},
-                None,
-            )
-            .await
-            .unwrap();
-        mongodb
-            .collection::<Document>("accounts")
-            .update_many(
-                doc! {"accountType": {"$in": ["ACCOUNT_RECEIVABLE", "TRADE_RECEIVABLE"]}},
-                doc! {"$set": {"postgresAccountType": "SUNDRY_DEBTOR"}},
-                None,
-            )
-            .await
-            .unwrap();
-        mongodb
-            .collection::<Document>("accounts")
-            .update_many(
-                doc! {"accountType": {"$in": ["GST_PAYABLE", "GST_RECEIVABLE"]}},
-                doc! {"$set": {"postgresAccountType": "DUTIES_AND_TAXES"}},
-                None,
-            )
-            .await
-            .unwrap();
     }
 
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
@@ -104,30 +81,38 @@ impl Account {
             )
             .await
             .unwrap();
-        let mut id: i32 = 100;
+        let mut id: i64 = 100;
         let mut updates = Vec::new();
-        let mut parent_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
-            let bill_wise_detail = ["SUNDRY_CREDITOR", "SUNDRY_DEBTOR"]
-                .contains(&d.get_str("postgresAccountType").unwrap());
+            let mut contact_type = "ACCOUNT";
+            let mut bill_wise_detail = false;
+            if d._get_i32("postgresAccountType").unwrap() == 16 {
+                contact_type = "CUSTOMER";
+                bill_wise_detail = true;
+            } else if d._get_i32("postgresAccountType").unwrap() == 19 {
+                contact_type = "VENDOR";
+                bill_wise_detail = true;
+            }
             let object_id = d.get_object_id("_id").unwrap();
             id += 1;
+
             postgres
                 .execute(
-                    "INSERT INTO accounts 
+                    "INSERT INTO account 
                     (
-                        id,name,alias_name,account_type,gst_tax,sac_code,bill_wise_detail
+                        id,name,alias_name,account_type_id,gst_tax_id,sac_code,bill_wise_detail,contact_type, transaction_enabled
                     )
                     OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text, true)",
                     &[
                         &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("aliasName").ok(),
-                        &d.get_str("postgresAccountType").unwrap(),
+                        &d._get_i32("postgresAccountType").unwrap(),
                         &d.get_str("tax").ok(),
                         &d.get_str("sacCode").ok(),
                         &bill_wise_detail,
+                        &contact_type
                     ],
                 )
                 .await
@@ -136,11 +121,6 @@ impl Account {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
             });
-            parent_ref_updates.push(doc! {
-                "q": { "parentAccount": object_id },
-                "u": { "$set": { "postgresParent": id} },
-                "multi": true
-            });
         }
         if !updates.is_empty() {
             let command = doc! {
@@ -148,35 +128,6 @@ impl Account {
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();
-
-            let command = doc! {
-                "update": "accounts",
-                "updates": &parent_ref_updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
-        }
-        let mut cur = mongodb
-            .collection::<Document>("accounts")
-            .find(
-                doc! {"postgresParent":{"$exists":true}},
-                find_opts(
-                    doc! {"_id": 0, "postgres": 1, "postgresParent": 1},
-                    doc! {"_id": 1},
-                ),
-            )
-            .await
-            .unwrap();
-        while let Some(Ok(d)) = cur.next().await {
-            postgres
-                .execute(
-                    "UPDATE accounts SET parent = $2 WHERE id = $1",
-                    &[
-                        &d.get_i32("postgres").unwrap(),
-                        &d.get_i32("postgresParent").unwrap(),
-                    ],
-                )
-                .await
-                .unwrap();
         }
     }
 }

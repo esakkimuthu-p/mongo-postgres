@@ -15,7 +15,7 @@ impl Section {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
+        let mut id: i64 = 0;
         let mut updates = Vec::new();
         let mut parent_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
@@ -67,8 +67,8 @@ impl Section {
                 .execute(
                     "UPDATE sections SET parent = $2 WHERE id = $1",
                     &[
-                        &d.get_i32("postgres").unwrap(),
-                        &d.get_i32("postgresParent").unwrap(),
+                        &d._get_i32("postgres").unwrap(),
+                        &d._get_i32("postgresParent").unwrap(),
                     ],
                 )
                 .await

@@ -48,8 +48,8 @@ impl AccountOpening {
                 .find_map(|x| {
                     (x.get_object_id("_id").unwrap() == d.get_object_id("account").unwrap())
                         .then_some((
-                            x.get_i32("postgres").unwrap(),
-                            x.get_str("postgresAccountType").unwrap(),
+                            x._get_i32("postgres").unwrap(),
+                            x._get_i32("postgresAccountType").unwrap(),
                         ))
                 })
                 .unwrap();
@@ -57,11 +57,11 @@ impl AccountOpening {
                 .iter()
                 .find_map(|x| {
                     (x.get_object_id("_id").unwrap() == d.get_object_id("branch").unwrap())
-                        .then_some(x.get_i32("postgres").unwrap())
+                        .then_some(x._get_i32("postgres").unwrap())
                 })
                 .unwrap();
             let mut ba: Vec<serde_json::Value> = Vec::new();
-            if ["SUNDRY_CREDITOR", "SUNDRY_DEBTOR"].contains(&account_type) {
+            if [16, 19].contains(&account_type) {
                 ba.push(serde_json::json!({
                     "id": Uuid::new().to_string(),
                     "amount": d._get_f64("debit").unwrap() - d._get_f64("credit").unwrap(),
@@ -69,18 +69,14 @@ impl AccountOpening {
                     "ref_no": "OPENING",
                 }));
             }
+            let data = serde_json::json!(
+                {
+                    "account_id": account, "branch_id": branch, "credit": d._get_f64("credit").unwrap(), "debit": d._get_f64("debit").unwrap(),
+                    "bill_allocations": (!ba.is_empty()).then_some(serde_json::to_value(ba).unwrap())
+                }
+            );
             postgres
-                .execute(
-                    "INSERT INTO account_openings (account,branch, credit, debit, bill_allocations, id) 
-                    VALUES ($1, $2, $3, $4, $5::JSONB, gen_random_uuid())",
-                    &[
-                        &account,
-                        &branch,
-                        &d._get_f64("credit").unwrap(),
-                        &d._get_f64("debit").unwrap(),
-                        &(!ba.is_empty()).then_some(serde_json::to_value(ba).unwrap())
-                    ],
-                )
+                .execute("select * from set_account_opening($1::json)", &[&data])
                 .await
                 .unwrap();
         }
