@@ -81,7 +81,7 @@ impl Account {
             )
             .await
             .unwrap();
-        let mut id: i64 = 100;
+        let mut id: i32 = 100;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let mut contact_type = "ACCOUNT";

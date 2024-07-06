@@ -9,7 +9,7 @@ impl FinancialYear {
             .find(doc! {}, None)
             .await
             .unwrap();
-        let mut id: i64 = 0;
+        let mut id: i32 = 0;
         let mut updates = Vec::new();
         postgres
             .execute("DELETE FROM financial_year", &[])

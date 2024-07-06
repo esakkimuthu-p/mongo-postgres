@@ -17,7 +17,7 @@ impl Branch {
             )
             .await
             .unwrap();
-        let mut id: i64 = 0;
+        let mut id: i32 = 0;
         let mut updates = Vec::new();
         let gst_registrations = mongodb
             .collection::<Document>("gst_registrations")

@@ -25,7 +25,7 @@ impl VoucherType {
             )
             .await
             .unwrap();
-        let mut id: i64 = 100;
+        let mut id: i32 = 100;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
@@ -141,7 +141,7 @@ impl VoucherType {
                 postgres
                     .execute(
                         "INSERT INTO voucher_type (id, name, base_type, config, prefix)
-                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4::json, $5)",
+                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3::text, $4::json, $5)",
                         &[
                             &id,
                             &d.get_str("name").unwrap(),

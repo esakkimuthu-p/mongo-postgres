@@ -108,11 +108,9 @@ impl Contact {
             if let Some(acc) = account {
                 postgres
                 .execute(
-                    &format!(
                         "update account set short_name = $2,pan_no = $3,aadhar_no = $4,gst_reg_type = $5,gst_location_id=$6,gst_no=$7,
                             mobile=$8,alternate_mobile=$9,email=$10,telephone=$11,contact_person=$12,address=$13,
                             city=$14,pincode=$15,state_id=$16,country_id=$17, contact_type = $18 where id = $1",
-                    ),
                     &[
                         &acc,
                         &d.get_str("shortName").ok(),
@@ -140,7 +138,6 @@ impl Contact {
                 println!("{:?}", contact_type);
                 postgres
                 .execute(
-                    &format!(
                         "INSERT INTO account 
                         (name,short_name,pan_no,aadhar_no,gst_reg_type,gst_location_id,gst_no,
                             mobile,alternate_mobile,email,telephone,contact_person,address,
@@ -148,7 +145,6 @@ impl Contact {
                     VALUES 
                         ($1,$2,$3,$4,$5::text,$6,$7,$8,$9,$10,$11,
                         $12,$13,$14,$15,$16,$17,$18::text,$19,false)",
-                    ),
                     &[
 
                         &d.get_str("name").unwrap(),

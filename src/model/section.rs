@@ -15,7 +15,7 @@ impl Section {
             )
             .await
             .unwrap();
-        let mut id: i64 = 0;
+        let mut id: i32 = 0;
         let mut updates = Vec::new();
         let mut parent_ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {

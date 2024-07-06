@@ -20,7 +20,7 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/ttgold"
+        default_value = "postgresql://postgres:1@localhost:5432/del"
     )]
     postgres: String,
 }
@@ -81,12 +81,12 @@ async fn main() {
     println!("DesktopClient start..");
     DesktopClient::create(&mongodb, &client).await; //ok
     println!("InventoryBranchBatch create start..");
-    InventoryBranchBatch::create(&mongodb).await; // ok
-    println!("Inventory opening start..");
-    Inventory::create(&mongodb, &client).await;
+    InventoryBranchBatch::create(&mongodb).await; //ok
+    println!("Inventory create start..");
+    Inventory::create(&mongodb, &client).await; //ok
     println!("InventoryBranchBatch opening start..");
     InventoryBranchBatch::opening(&mongodb, &client).await;
     println!("VoucherNumSequence start..");
-    VoucherNumSequence::create(&mongodb, &client).await; //ok
+    VoucherNumSequence::create(&mongodb, &client).await;
     println!("END***{}****", &mongodb.name());
 }

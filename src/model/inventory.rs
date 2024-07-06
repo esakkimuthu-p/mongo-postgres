@@ -72,7 +72,7 @@ impl Inventory {
             )
             .await
             .unwrap();
-        let mut id: i64 = 0;
+        let mut id: i32 = 2;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
@@ -140,12 +140,12 @@ impl Inventory {
                 postgres
                 .execute(
                     "INSERT INTO inventory 
-                    (id,name, division, allow_negative_stock, gst_tax, unit, sale_unit, purchase_unit,cess,
-                        purchase_config,sale_config, barcodes,hsn_code, description, manufacturer, manufacturer_name, 
-                        salts, schedule_h, schedule_h1, narcotics, enable_expiry,loose_qty
+                    (id,name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
+                        purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, manufacturer_name, 
+                        salts,loose_qty
                     ) 
                     OVERRIDING SYSTEM VALUE VALUES 
-                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)",
+                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
                     &[
                         &id,
                         &name,
@@ -164,10 +164,6 @@ impl Inventory {
                         &manufacturer,
                         &manufacturer_name,
                         &(!salts.is_empty()).then_some(salts.clone()),
-                        &d.get_bool("scheduleH").ok(),
-                        &d.get_bool("scheduleH1").ok(),
-                        &d.get_bool("narcotics").ok(),
-                        &d.get_bool("enableExpiry").unwrap_or_default(),
                         &loose_qty
                     ],
                 )
@@ -195,16 +191,15 @@ impl Inventory {
                             postgres
                             .execute(
                                 "INSERT INTO inventory_branch_detail 
-                                (inventory,inventory_name, branch, branch_name, inventory_barcodes, rack, s_disc) 
+                                (inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, s_disc) 
                                 VALUES 
-                                ($1,$2,$3,$4,$5,$6,$7::JSON)",
+                                ($1,$2,$3,$4,$5,$6::JSON)",
                                 &[
                                     &id,
                                     &name,
                                     &branch_id,
                                     &br.get_str("name").unwrap(),
                                     &barcodes,
-                                    &rack,
                                     &s_disc
                                 ],
                             )

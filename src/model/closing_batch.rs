@@ -1,4 +1,4 @@
-use mongodb::{bson::Uuid, IndexModel};
+use mongodb::IndexModel;
 
 use super::*;
 
@@ -62,7 +62,7 @@ impl InventoryBranchBatch {
                                "qty": "$qty",
                                "nlc": {"$ifNull": ["$avgNlc", {"$ifNull": ["$pRate", 0.0]}]},
                                "cost": {"$ifNull": ["$avgNlc", {"$ifNull": ["$pRate", 0.0]}]},
-                               "unit": "$unit",
+                               "unit_id": "$unit",
                                "unit_conv": 1,
                                "loose_qty": "$looseQty",
                                "rate": {"$ifNull": ["$pRate", {"$ifNull": ["$avgNlc", 0.0]}]},
@@ -106,26 +106,20 @@ impl InventoryBranchBatch {
                         .then_some(x._get_i32("postgres").unwrap())
                 })
                 .unwrap();
-            let mut trns = d
+            let trns = d
                 .get_array("inv_trns")
                 .unwrap()
                 .iter()
                 .map(|x| x.as_document().unwrap().clone())
                 .collect::<Vec<Document>>();
-            for trn in trns.iter_mut() {
-                trn.insert("id", Uuid::new().to_string());
-            }
+            let data = serde_json::json!({
+                "branch_id": branch,
+                "warehouse_id": 1,
+                "inventory_id":d._get_i32("inventory").unwrap(),
+                "inv_items": &serde_json::to_value(trns).unwrap(),
+            });
             postgres
-                .execute(
-                    "INSERT INTO inventory_openings
-                        (inventory_id,branch_id,inv_items)
-                    VALUES ($1, $2, $3::JSONB)",
-                    &[
-                        &d._get_i32("inventory").unwrap(),
-                        &branch,
-                        &serde_json::to_value(trns).unwrap(),
-                    ],
-                )
+                .execute("select * from set_inventory_opening($1::json)", &[&data])
                 .await
                 .unwrap();
         }

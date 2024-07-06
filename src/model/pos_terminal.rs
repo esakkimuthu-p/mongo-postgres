@@ -26,7 +26,7 @@ impl PosTerminal {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
-        let mut id: i64 = 0;
+        let mut id: i32 = 0;
         while let Some(Ok(d)) = cur.next().await {
             id += 1;
             let branch = branches

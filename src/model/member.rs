@@ -15,7 +15,7 @@ impl Member {
             )
             .await
             .unwrap();
-        let mut id: i64 = 1;
+        let mut id: i32 = 1;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
