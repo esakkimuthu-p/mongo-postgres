@@ -63,7 +63,7 @@ impl VoucherNumSequence {
                     .unwrap();
                 postgres
                 .execute(
-                    "INSERT INTO voucher_numbering (branch,voucher_type,f_year,seq) VALUES ($1, $2,$3,$4)",
+                    "INSERT INTO voucher_numbering (branch_id,voucher_type_id,f_year_id,seq) VALUES ($1, $2,$3,$4)",
                     &[&branch,&v_type, &f_year,&d._get_i32("sequence").unwrap()],
                 )
                 .await

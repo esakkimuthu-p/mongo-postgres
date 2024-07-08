@@ -12,7 +12,7 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "mongodb+srv://testadmin:rootroot@auditplus-test.dqqxs.mongodb.net/ttgold2"
+        default_value = "mongodb://testadmin:rootroot@localhost:27017"
     )]
     mongodb: String,
 
@@ -20,7 +20,7 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/del"
+        default_value = "postgresql://postgres:1@localhost:5432/ttgold"
     )]
     postgres: String,
 }
@@ -76,6 +76,8 @@ async fn main() {
     Voucher::create(&mongodb, &client).await; //ok
     println!("Unit start..");
     Unit::create(&mongodb, &client).await; //ok
+    println!("Stock location start..");
+    Rack::create(&mongodb, &client).await; //ok
     println!("SaleIncharge start..");
     SaleIncharge::create(&mongodb, &client).await; //ok
     println!("DesktopClient start..");

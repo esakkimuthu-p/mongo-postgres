@@ -189,7 +189,7 @@ $$ language plpgsql;",
                             let mut p_gst = json!({
                                 "reg_type": reg_type, 
                                 "location": gst.get_str("location").ok()});
-                            if let Ok(x) = gst.get_str("location") {
+                            if let Ok(x) = gst.get_str("gstNo") {
                                 p_gst["gst_no"] = json!(x);
                             }
                             party_gst = Some(p_gst);

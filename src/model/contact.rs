@@ -26,7 +26,6 @@ impl Contact {
             .await
             .unwrap();
         let last_account_id: i64 = row.get(0);
-        println!("{:?}", last_account_id);
         let _x = postgres
             .execute(
                 &format!(
@@ -44,7 +43,6 @@ impl Contact {
         //     )
         //     .await
         //     .unwrap();
-        println!("{:?}", last_account_id);
         let mut cur = mongodb
             .collection::<Document>("contacts")
             .find(
@@ -135,7 +133,6 @@ impl Contact {
                 .await
                 .unwrap();
             } else {
-                println!("{:?}", contact_type);
                 postgres
                 .execute(
                         "INSERT INTO account 

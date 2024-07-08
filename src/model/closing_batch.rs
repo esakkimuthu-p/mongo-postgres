@@ -19,19 +19,12 @@ impl InventoryBranchBatch {
                 doc!{
                     "$project": {
                         "closing": { "$subtract": ["$inward", "$outward"] },
-                        "inventory": 1, "branch": 1, "sRate": 1, "mrp": 1, "pRate": 1,
+                        "inventory": 1, "branch": 1, "sRate": {"$round": ["$sRate", 2]}, "mrp": {"$round": ["$mrp", 2]}, "pRate": {"$round": ["$pRate", 2]},
                         "unit": {"$arrayElemAt": ["$unit.postgres", 0]},
                         "batchNo": 1, "expiry": 1,"avgNlc": 1,
-                        "qty": {"$cond": [
-                            { "$eq": [{ "$mod": [ { "$subtract": ["$inward", "$outward"] }, "$unitConv"] }, 0] },
-                            {"$divide": [ { "$subtract": ["$inward", "$outward"] }, "$unitConv"]},
-                            { "$subtract": ["$inward", "$outward"] }
-                        ]},
-                        "looseQty": {"$cond": [
-                            { "$eq": [{ "$mod": [ { "$subtract": ["$inward", "$outward"] }, "$unitConv"] }, 0] },
-                            "$unitConv",
-                            1
-                        ]}
+                        "qty": { "$round": [{ "$divide": [{ "$subtract": ["$inward", "$outward"] }, "$unitConv"] }, 4] },
+                        "is_loose_qty": { "$cond": [{ "$gt": ["$unitConv", 1] }, true, false] },
+                        "unitConv":1,
                     }
                 },
                 doc!{ "$out": "closing_batches"}
@@ -42,7 +35,7 @@ impl InventoryBranchBatch {
             .await
             .unwrap();
         let idx = IndexModel::builder()
-            .keys(doc! {"inventory":1, "looseQty": 1})
+            .keys(doc! {"inventory":1, "unitConv": 1})
             .build();
         mongodb
             .collection::<Document>("closing_batches")
@@ -64,7 +57,7 @@ impl InventoryBranchBatch {
                                "cost": {"$ifNull": ["$avgNlc", {"$ifNull": ["$pRate", 0.0]}]},
                                "unit_id": "$unit",
                                "unit_conv": 1,
-                               "loose_qty": "$looseQty",
+                               "is_loose_qty": "$is_loose_qty",
                                "rate": {"$ifNull": ["$pRate", {"$ifNull": ["$avgNlc", 0.0]}]},
                                "batch_no": "$batchNo",
                                "mrp": "$mrp",

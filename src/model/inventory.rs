@@ -191,16 +191,17 @@ impl Inventory {
                             postgres
                             .execute(
                                 "INSERT INTO inventory_branch_detail 
-                                (inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, s_disc) 
+                                (inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, s_disc, stock_location_id) 
                                 VALUES 
-                                ($1,$2,$3,$4,$5,$6::JSON)",
+                                ($1,$2,$3,$4,$5,$6::JSON,$7)",
                                 &[
                                     &id,
                                     &name,
                                     &branch_id,
                                     &br.get_str("name").unwrap(),
                                     &barcodes,
-                                    &s_disc
+                                    &s_disc,
+                                    &rack
                                 ],
                             )
                             .await
@@ -209,7 +210,7 @@ impl Inventory {
                     }
                 }
                 updates.push(doc! {
-                    "q": { "inventory": object_id, "looseQty": loose_qty },
+                    "q": { "inventory": object_id, "unitConv": loose_qty },
                     "u": { "$set": { "postgres": id} },
                     "multi": true
                 });
