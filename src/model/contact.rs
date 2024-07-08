@@ -7,11 +7,8 @@ impl Contact {
         let accounts = mongodb
             .collection::<Document>("accounts")
             .find(
-                doc! {"postgresAccountType": {"$in":["SUNDRY_DEBTOR", "SUNDRY_CREDITOR"]}},
-                find_opts(
-                    doc! {"_id": 1, "postgres": 1, "postgresAccountType": 1},
-                    doc! {"_id": 1},
-                ),
+                doc! {"postgresAccountType": {"$in":[16, 19]}},
+                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
             )
             .await
             .unwrap()
@@ -29,20 +26,13 @@ impl Contact {
         let _x = postgres
             .execute(
                 &format!(
-                    "alter sequence public.account_id_seq restart start {}",
+                    "alter sequence account_id_seq restart start {}",
                     last_account_id + 1
                 ),
                 &[],
             )
             .await
             .unwrap();
-        // postgres
-        //     .execute(
-        //         &format!("alter sequence account_id_seq start with 1000"),
-        //         &[],
-        //     )
-        //     .await
-        //     .unwrap();
         let mut cur = mongodb
             .collection::<Document>("contacts")
             .find(
