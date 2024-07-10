@@ -15,16 +15,13 @@ impl Manufacturer {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
-            postgres
-                .execute(
-                    "INSERT INTO manufacturer (id,name, mobile, email, telephone) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5)",
+            let id : i32 =postgres
+                .query_one(
+                    "INSERT INTO manufacturer (name, mobile, email, telephone) VALUES ($1, $2, $3, $4) returning id",
                     &[
-                        &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("mobile").ok(),
                         &d.get_str("email").ok(),
@@ -32,7 +29,8 @@ impl Manufacturer {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap()
+                .get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },

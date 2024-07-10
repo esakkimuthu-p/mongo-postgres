@@ -15,23 +15,20 @@ impl Unit {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
-            postgres
-                .execute(
-                    "INSERT INTO unit (id,name,uqc_id,symbol,precision) OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, 0)",
+            let id: i32=  postgres
+                .query_one(
+                    "INSERT INTO unit (name,uqc_id,symbol,precision)VALUES ($1, $2, $3, 0) returning id",
                     &[
-                        &id,
                         &d.get_str("name").unwrap(), 
                         &d.get_str("uqc").unwrap(), 
                         &d.get_str("symbol").unwrap(),
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap().get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },

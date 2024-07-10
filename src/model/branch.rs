@@ -17,7 +17,6 @@ impl Branch {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
         let mut updates = Vec::new();
         let gst_registrations = mongodb
             .collection::<Document>("gst_registrations")
@@ -54,7 +53,6 @@ impl Branch {
             .unwrap();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
             let mut mobile = None;
             let mut alternate_mobile = None;
             let mut email = None;
@@ -118,16 +116,14 @@ impl Branch {
                         .then_some(x._get_i32("postgres").unwrap())
                 })
                 .unwrap();
-            postgres
-                .execute(
+            let id: i32= postgres
+                .query_one(
                     "INSERT INTO branch 
-                        (id,name,mobile,alternate_mobile,email,telephone,contact_person,address,
+                        (name,mobile,alternate_mobile,email,telephone,contact_person,address,
                             city,pincode,state_id,country_id, gst_registration_id, voucher_no_prefix, 
-                            misc, account_id, members) 
-                    OVERRIDING SYSTEM VALUE VALUES 
-                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
+                            misc, account_id, members)  VALUES 
+                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning id",
                     &[
-                        &id,
                         &d.get_str("name").unwrap(),
                         &mobile,
                         &alternate_mobile,
@@ -147,7 +143,7 @@ impl Branch {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap().get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },

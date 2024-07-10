@@ -15,19 +15,15 @@ impl TdsNatureOfPayment {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
-            postgres
-                .execute(
+            let id :i32 = postgres
+                .query_one(
                     "INSERT INTO tds_nature_of_payment 
-                    (id,name,section,ind_huf_rate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold) 
-                    OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    (name,section,ind_huf_rate,ind_huf_rate_wo_pan,other_deductee_rate,other_deductee_rate_wo_pan,threshold)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7) returning id",
                     &[
-                        &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("section").ok(),
                         &d._get_f64("indHufRate").unwrap_or_default(),
@@ -38,7 +34,7 @@ impl TdsNatureOfPayment {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap().get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },

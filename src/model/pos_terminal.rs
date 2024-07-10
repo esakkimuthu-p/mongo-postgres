@@ -26,9 +26,7 @@ impl PosTerminal {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
-        let mut id: i32 = 0;
         while let Some(Ok(d)) = cur.next().await {
-            id += 1;
             let branch = branches
                 .iter()
                 .find_map(|x| {
@@ -38,10 +36,9 @@ impl PosTerminal {
                 .unwrap();
             postgres
                 .execute(
-                    "INSERT INTO pos_server (id,name,branch_id,mode,is_active)
-                     OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3, $4, $5)",
+                    "INSERT INTO pos_server (name,branch_id,mode,is_active)
+                     VALUES ($1, $2, $3, $4)",
                     &[
-                        &id,
                         &d.get_str("name").unwrap(),
                         &branch,
                         &d.get_str("mode").unwrap(),

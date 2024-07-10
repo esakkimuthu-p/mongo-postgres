@@ -112,7 +112,7 @@ impl Voucher {
             .unwrap();
         postgres
             .execute(
-                "create function create_voucher_via_script(json, uuid default null)
+                "create or replace function create_voucher_via_script(json, uuid default null)
     returns bool
 as
 $$
@@ -152,7 +152,7 @@ $$ language plpgsql;",
             let mut cur = mongodb
             .collection::<Document>(collection)
             .find(
-                doc! {},
+                doc! {"act": false},
                 find_opts(
                     doc! {"createdBy": 0, "createdAt": 0, "updatedAt": 0, "updatedBy": 0, "invTrns": 0},
                     doc! {"_id": 1},
@@ -412,13 +412,15 @@ $$ language plpgsql;",
                    "branch_gst": &branch_gst,
                    "party_gst": &party_gst,
                 });
-                postgres
+                let res = postgres
                     .execute(
                         "select * from create_voucher_via_script($1::json)",
                         &[&data],
                     )
-                    .await
-                    .unwrap();
+                    .await;
+                if let Err(x) = res {
+                    panic!("ERROR msg{} \n data: {}", x, data);
+                }
             }
             println!("end {}...", collection);
         }

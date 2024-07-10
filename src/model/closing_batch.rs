@@ -44,14 +44,14 @@ impl InventoryBranchBatch {
             .unwrap();
     }
     pub async fn opening(mongodb: &Database, postgres: &PostgresClient) {
-        let mut cur = mongodb
+        mongodb
             .collection::<Document>("closing_batches")
             .aggregate(
                 vec![
                     doc! {
                         "$group": {
                             "_id": {"branch": "$branch", "postgres": "$postgres"},
-                            "inv_trns": {"$push": {
+                            "inv_items": {"$push": {
                                "qty": "$qty",
                                "nlc": {"$ifNull": ["$avgNlc", {"$ifNull": ["$pRate", 0.0]}]},
                                "cost": {"$ifNull": ["$avgNlc", {"$ifNull": ["$pRate", 0.0]}]},
@@ -67,50 +67,34 @@ impl InventoryBranchBatch {
                             }}
                         }
                     },
+                    doc! {"$lookup": {
+                        "from": "branches",
+                        "localField": "_id.branch",
+                        "foreignField": "_id",
+                        "as": "br"
+                    }},
                     doc! {
                         "$project": {
                             "_id": 0,
-                            "branch": "$_id.branch",
-                            "inventory": "$_id.postgres",
-                            "inv_trns": 1
+                            "branch_id": {"$arrayElemAt": ["$br.postgres", 0]},
+                            "inventory_id": "$_id.postgres",
+                            "warehouse_id": {"$literal": 1},
+                            "inv_items": 1
                         }
                     },
+                    doc! { "$out": "inv_opening"},
                 ],
                 None,
             )
             .await
             .unwrap();
-        let branches = mongodb
-            .collection::<Document>("branches")
-            .find(
-                doc! {},
-                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
-            )
-            .await
-            .unwrap()
-            .try_collect::<Vec<Document>>()
+        let mut cur = mongodb
+            .collection::<Document>("inv_opening")
+            .find(doc! {}, None)
             .await
             .unwrap();
         while let Some(Ok(d)) = cur.next().await {
-            let branch = branches
-                .iter()
-                .find_map(|x| {
-                    (x.get_object_id("_id").unwrap() == d.get_object_id("branch").unwrap())
-                        .then_some(x._get_i32("postgres").unwrap())
-                })
-                .unwrap();
-            let trns = d
-                .get_array("inv_trns")
-                .unwrap()
-                .iter()
-                .map(|x| x.as_document().unwrap().clone())
-                .collect::<Vec<Document>>();
-            let data = serde_json::json!({
-                "branch_id": branch,
-                "warehouse_id": 1,
-                "inventory_id":d._get_i32("inventory").unwrap(),
-                "inv_items": &serde_json::to_value(trns).unwrap(),
-            });
+            let data = &serde_json::to_value(d).unwrap();
             postgres
                 .execute("select * from set_inventory_opening($1::json)", &[&data])
                 .await

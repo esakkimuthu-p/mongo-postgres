@@ -49,7 +49,7 @@ impl DesktopClient {
             postgres
                 .execute(
                     "INSERT INTO desktop_client (name,branches,access) 
-                    OVERRIDING SYSTEM VALUE VALUES ($1, $2, $3)",
+                    VALUES ($1, $2, $3)",
                     &[
                         &d.get_str("name").unwrap(),
                         &br_ids,

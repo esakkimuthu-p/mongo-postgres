@@ -81,7 +81,6 @@ impl Account {
             )
             .await
             .unwrap();
-        let mut id: i32 = 100;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let mut contact_type = "ACCOUNT";
@@ -94,29 +93,28 @@ impl Account {
                 bill_wise_detail = true;
             }
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
 
-            postgres
-                .execute(
+            let id: i32 = postgres
+                .query_one(
                     "INSERT INTO account 
                     (
-                        id,name,alias_name,account_type_id,gst_tax_id,sac_code,bill_wise_detail,contact_type, transaction_enabled
+                        name,alias_name,account_type_id,gst_tax_id,sac_code,
+                        bill_wise_detail,contact_type, transaction_enabled
                     )
-                    OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text, true)",
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, true) returning id",
                     &[
-                        &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("aliasName").ok(),
                         &d._get_i32("postgresAccountType").unwrap(),
                         &d.get_str("tax").ok(),
                         &d.get_str("sacCode").ok(),
                         &bill_wise_detail,
-                        &contact_type
+                        &contact_type,
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap()
+                .get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },

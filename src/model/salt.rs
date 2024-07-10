@@ -1,11 +1,11 @@
 use super::*;
 
-pub struct Division;
+pub struct Salt;
 
-impl Division {
+impl Salt {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("inventory_heads")
+            .collection::<Document>("pharma_salts")
             .find(
                 doc! {},
                 find_opts(
@@ -20,7 +20,7 @@ impl Division {
             let object_id = d.get_object_id("_id").unwrap();
             let id: i32 = postgres
                 .query_one(
-                    "INSERT INTO division (name) VALUES ($1) returning id",
+                    "INSERT INTO pharma_salt (name) VALUES ($1) returning id",
                     &[&d.get_str("name").unwrap()],
                 )
                 .await
@@ -33,7 +33,7 @@ impl Division {
         }
         if !updates.is_empty() {
             let command = doc! {
-                "update": "inventory_heads",
+                "update": "pharma_salts",
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();

@@ -9,7 +9,6 @@ impl FinancialYear {
             .find(doc! {}, None)
             .await
             .unwrap();
-        let mut id: i32 = 0;
         let mut updates = Vec::new();
         postgres
             .execute("DELETE FROM financial_year", &[])
@@ -17,18 +16,16 @@ impl FinancialYear {
             .unwrap();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
-            postgres
-                .execute(
-                    "INSERT INTO financial_year (id,fy_start,fy_end) OVERRIDING SYSTEM VALUE VALUES ($1, $2::TEXT::DATE, $3::TEXT::DATE)",
+            let id : i32 = postgres
+                .query_one(
+                    "INSERT INTO financial_year (fy_start,fy_end) VALUES ($1::text::date, $2::text::date) returning id",
                     &[
-                        &id,
                         &d.get_str("fStart").unwrap(),
                         &d.get_str("fEnd").unwrap(),
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap().get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },

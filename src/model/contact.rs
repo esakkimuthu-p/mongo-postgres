@@ -15,24 +15,6 @@ impl Contact {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
-        let row = &postgres
-            .query_one(
-                "select id::bigint from account order by id desc limit 1",
-                &[],
-            )
-            .await
-            .unwrap();
-        let last_account_id: i64 = row.get(0);
-        let _x = postgres
-            .execute(
-                &format!(
-                    "alter sequence account_id_seq restart start {}",
-                    last_account_id + 1
-                ),
-                &[],
-            )
-            .await
-            .unwrap();
         let mut cur = mongodb
             .collection::<Document>("contacts")
             .find(

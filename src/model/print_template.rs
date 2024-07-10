@@ -15,18 +15,14 @@ impl PrintTemplate {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
-        let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
             postgres
                 .execute(
-                    "INSERT INTO print_template (id,name,template,layout,voucher_mode) 
-                    OVERRIDING SYSTEM VALUE VALUES 
-                    ($1, $2, $3, $4, $5)",
+                    "INSERT INTO print_template (name,template,layout,voucher_mode) 
+                    VALUES 
+                    ($1, $2, $3, $4)",
                     &[
-                        &id,
                         &d.get_str("name").unwrap(),
                         &d.get_str("template").unwrap(),
                         &d.get_str("layout").unwrap(),
@@ -35,17 +31,6 @@ impl PrintTemplate {
                 )
                 .await
                 .unwrap();
-            updates.push(doc! {
-                "q": { "_id": object_id },
-                "u": { "$set": { "postgres": id} },
-            });
-        }
-        if !updates.is_empty() {
-            let command = doc! {
-                "update": "print_templates",
-                "updates": &updates
-            };
-            mongodb.run_command(command, None).await.unwrap();
         }
     }
 }

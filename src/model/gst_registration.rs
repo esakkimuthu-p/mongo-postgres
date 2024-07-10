@@ -15,21 +15,18 @@ impl GstRegistration {
             )
             .await
             .unwrap();
-        let mut id: i32 = 0;
         let mut updates = Vec::new();
         let mut ref_updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             let gst_no = d.get_str("gstNo").unwrap_or_default();
-            id += 1;
-            postgres
-                .execute(
+            let id: i32 = postgres
+                .query_one(
                     "INSERT INTO gst_registration 
-                    (id, gst_no, state_id, username,email,e_invoice_username, e_password) 
-                    OVERRIDING SYSTEM VALUE VALUES 
-                    ($1, $2, $3, $4, $5, $6, $7)",
+                    (gst_no, state_id, username,email,e_invoice_username, e_password) 
+                    VALUES 
+                    ($1, $2, $3, $4, $5, $6) returning id",
                     &[
-                        &id,
                         &d.get_str("gstNo").unwrap_or_default(),
                         &"33",
                         &d.get_str("username").ok(),
@@ -39,7 +36,8 @@ impl GstRegistration {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap()
+                .get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },

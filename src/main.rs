@@ -9,18 +9,14 @@ use model::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// mongodb Organization cluster MONGO-URI.
-    #[clap(
-        short,
-        long,
-        default_value = "mongodb://testadmin:rootroot@localhost:27017"
-    )]
+    #[clap(short, long, default_value = "mongodb://localhost:27017/velavanmed")]
     mongodb: String,
 
     /// postgres Organization HOST.
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/ttgold"
+        default_value = "postgresql://postgres:1@localhost:5432/velavanmed"
     )]
     postgres: String,
 }
@@ -82,6 +78,8 @@ async fn main() {
     SaleIncharge::create(&mongodb, &client).await; //ok
     println!("DesktopClient start..");
     DesktopClient::create(&mongodb, &client).await; //ok
+    println!("Salt create start..");
+    Salt::create(&mongodb, &client).await; //ok
     println!("InventoryBranchBatch create start..");
     InventoryBranchBatch::create(&mongodb).await; //ok
     println!("Inventory create start..");

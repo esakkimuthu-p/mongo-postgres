@@ -61,6 +61,17 @@ impl Inventory {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
+        let racks = mongodb
+            .collection::<Document>("racks")
+            .find(
+                doc! {},
+                find_opts(doc! {"_id": 1, "displayName": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
         let mut cur = mongodb
             .collection::<Document>("inventories")
             .find(
@@ -72,7 +83,6 @@ impl Inventory {
             )
             .await
             .unwrap();
-        let mut id: i32 = 2;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
@@ -121,7 +131,6 @@ impl Inventory {
                 manufacturer_name = d.get_str("manufacturerName").ok();
             }
             for u in inv_units {
-                id += 1;
                 let loose_qty = u._get_i32("conversion").unwrap();
                 let mut name = d.get_string("name").unwrap();
                 let (unit, unit_name) = units
@@ -137,17 +146,14 @@ impl Inventory {
                 if loose_qty != 1 {
                     name = format!("{} - {}", name, unit_name);
                 }
-                postgres
-                .execute(
+                let id : i32 = postgres
+                .query_one(
                     "INSERT INTO inventory 
-                    (id,name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
+                    (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
                         purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, manufacturer_name, 
-                        salts,loose_qty
-                    ) 
-                    OVERRIDING SYSTEM VALUE VALUES 
-                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
+                        salts,loose_qty) VALUES 
+                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id",
                     &[
-                        &id,
                         &name,
                         &division,
                         &d.get_bool("allowNegativeStock").unwrap_or_default(),
@@ -168,7 +174,7 @@ impl Inventory {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap().get(0);
                 let mut b_ids = HashSet::new();
                 for br_de in d
                     .get_array("branchDetails")
@@ -182,9 +188,16 @@ impl Inventory {
                     if let Some(br) = branch {
                         let branch_id = br._get_i32("postgres").unwrap();
                         if b_ids.insert(branch_id) {
-                            let rack = br_de
+                            let rack_id = br_de
                                 ._get_document("rack")
-                                .and_then(|x| x.get_string("displayName"));
+                                .and_then(|x| x.get_object_id("id").ok());
+                            let mut rack_name = None;
+                            if let Some(rac) = rack_id {
+                                rack_name = racks.iter().find_map(|x| {
+                                    (x.get_object_id("_id").unwrap() == rac)
+                                        .then_some(x.get_string("displayName").unwrap())
+                                });
+                            }
                             let s_disc = br_de
                                 ._get_document("sDisc")
                                 .map(|x| serde_json::to_value(x).unwrap());
@@ -201,7 +214,7 @@ impl Inventory {
                                     &br.get_str("name").unwrap(),
                                     &barcodes,
                                     &s_disc,
-                                    &rack
+                                    &rack_name
                                 ],
                             )
                             .await

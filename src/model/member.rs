@@ -15,19 +15,15 @@ impl Member {
             )
             .await
             .unwrap();
-        let mut id: i32 = 1;
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            id += 1;
-            postgres
-                .execute(
+            let id: i32 = postgres
+                .query_one(
                     "INSERT INTO member
-                        (id,name,user_id, pass,nick_name,remote_access, is_root)
-                    OVERRIDING SYSTEM VALUE
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                        (name,user_id, pass,nick_name,remote_access, is_root, role_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, 'admin') returning id",
                     &[
-                        &id,
                         &d.get_str("username").unwrap(),
                         &d.get_object_id("user").ok().map(|x| x.to_hex()),
                         &d.get_str("username").unwrap(),
@@ -37,7 +33,8 @@ impl Member {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap()
+                .get(0);
             updates.push(doc! {
                 "q": { "_id": object_id },
                 "u": { "$set": { "postgres": id} },
