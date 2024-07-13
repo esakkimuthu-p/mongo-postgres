@@ -23,7 +23,7 @@ impl InventoryBranchBatch {
                         "unit": {"$arrayElemAt": ["$unit.postgres", 0]},
                         "batchNo": 1, "expiry": 1,"avgNlc": 1,
                         "qty": { "$round": [{ "$divide": [{ "$subtract": ["$inward", "$outward"] }, "$unitConv"] }, 4] },
-                        "is_loose_qty": { "$cond": [{ "$gt": ["$unitConv", 1] }, true, false] },
+                        "is_loose_qty": { "$cond": [{ "$gt": ["$unitConv", 1] }, false, true] },
                         "unitConv":1,
                     }
                 },

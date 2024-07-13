@@ -130,17 +130,28 @@ impl Inventory {
                 });
                 manufacturer_name = d.get_str("manufacturerName").ok();
             }
+            let primary_unit_id = inv_units
+                .iter()
+                .find_map(|x| {
+                    (x._get_i32("conversion").unwrap() == 1)
+                        .then_some(x.get_object_id("unitId").unwrap())
+                })
+                .unwrap();
+            let primary_unit = units
+                .iter()
+                .find_map(|x| {
+                    (x.get_object_id("_id").unwrap() == primary_unit_id)
+                        .then_some(x._get_i32("postgres").unwrap())
+                })
+                .unwrap();
             for u in inv_units {
                 let loose_qty = u._get_i32("conversion").unwrap();
                 let mut name = d.get_string("name").unwrap();
-                let (unit, unit_name) = units
+                let unit_name = units
                     .iter()
                     .find_map(|x| {
                         (x.get_object_id("_id").unwrap() == u.get_object_id("unitId").unwrap())
-                            .then_some((
-                                x._get_i32("postgres").unwrap(),
-                                x.get_str("name").unwrap(),
-                            ))
+                            .then_some(x.get_str("name").unwrap())
                     })
                     .unwrap();
                 if loose_qty != 1 {
@@ -158,9 +169,9 @@ impl Inventory {
                         &division,
                         &d.get_bool("allowNegativeStock").unwrap_or_default(),
                         &d.get_str("tax").unwrap(),
-                        &unit,
-                        &unit,
-                        &unit,
+                        &primary_unit,
+                        &primary_unit,
+                        &primary_unit,
                         &cess,
                         &serde_json::json!({"mrp_editable": true, "tax_editable": true, "free_editable": true, "disc_1_editable": true, "disc_2_editable": true, "p_rate_editable": true, "s_rate_editable": true}),
                         &serde_json::json!({"rate_editable": false, "tax_editable": false, "unit_editable": false, "disc_editable": false}),

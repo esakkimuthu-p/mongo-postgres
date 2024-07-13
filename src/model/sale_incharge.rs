@@ -18,8 +18,12 @@ impl SaleIncharge {
         while let Some(Ok(d)) = cur.next().await {
             postgres
                 .execute(
-                    "INSERT INTO sale_incharge (name,code) VALUES ($1,$2)",
-                    &[&d.get_str("name").unwrap(), &d.get_str("code").unwrap()],
+                    "INSERT INTO sales_person (name) VALUES ($1)",
+                    &[&format!(
+                        "{}-{}",
+                        &d.get_str("name").unwrap(),
+                        &d.get_str("code").unwrap()
+                    )],
                 )
                 .await
                 .unwrap();
