@@ -39,6 +39,17 @@ impl Inventory {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
+        let sections = mongodb
+            .collection::<Document>("sections")
+            .find(
+                doc! {},
+                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
         let pharma_salts = mongodb
             .collection::<Document>("pharma_salts")
             .find(
@@ -95,6 +106,7 @@ impl Inventory {
                 })
                 .unwrap();
             let mut cess = None;
+
             if let Some(c) = d._get_document("cess") {
                 if !c.is_empty() {
                     cess = Some(
@@ -123,12 +135,19 @@ impl Inventory {
             }
             let mut manufacturer = None;
             let mut manufacturer_name = None;
+            let mut category1 = None;
             if let Ok(id) = d.get_object_id("manufacturerId") {
                 manufacturer = manufacturers.iter().find_map(|x| {
                     (x.get_object_id("_id").unwrap() == id)
                         .then_some(x._get_i32("postgres").unwrap())
                 });
                 manufacturer_name = d.get_str("manufacturerName").ok();
+            }
+            if let Ok(id) = d.get_object_id("sectionId") {
+                category1 = sections.iter().find_map(|x| {
+                    (x.get_object_id("_id").unwrap() == id)
+                        .then_some(vec![x._get_i32("postgres").unwrap()])
+                });
             }
             let primary_unit_id = inv_units
                 .iter()
@@ -162,8 +181,8 @@ impl Inventory {
                     "INSERT INTO inventory 
                     (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
                         purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, manufacturer_name, 
-                        salts,loose_qty) VALUES 
-                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id",
+                        salts,loose_qty,category1) VALUES 
+                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning id",
                     &[
                         &name,
                         &division,
@@ -181,7 +200,8 @@ impl Inventory {
                         &manufacturer,
                         &manufacturer_name,
                         &(!salts.is_empty()).then_some(salts.clone()),
-                        &loose_qty
+                        &loose_qty,
+                        &category1
                     ],
                 )
                 .await

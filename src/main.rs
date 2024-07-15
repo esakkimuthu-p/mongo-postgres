@@ -74,6 +74,8 @@ async fn main() {
     Unit::create(&mongodb, &client).await; //ok
     println!("Stock location start..");
     Rack::create(&mongodb, &client).await; //ok
+    println!("Stock location start..");
+    Section::create(&mongodb, &client).await; //ok
     println!("SaleIncharge start..");
     SaleIncharge::create(&mongodb, &client).await; //ok
     println!("DesktopClient start..");
