@@ -6,6 +6,13 @@ pub struct Inventory;
 
 impl Inventory {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
+        postgres
+            .execute(
+                "INSERT INTO price_list (name) VALUES ('main price list')",
+                &[],
+            )
+            .await
+            .unwrap();
         let inventory_heads = mongodb
             .collection::<Document>("inventory_heads")
             .find(
@@ -44,6 +51,17 @@ impl Inventory {
             .find(
                 doc! {},
                 find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
+        let closing_batches = mongodb
+            .collection::<Document>("closing_batches")
+            .find(
+                doc! {},
+                find_opts(doc! {"_id": 0, "inventory": 1, "unitConv": 1}, doc! {}),
             )
             .await
             .unwrap()
@@ -165,99 +183,121 @@ impl Inventory {
                 .unwrap();
             for u in inv_units {
                 let loose_qty = u._get_i32("conversion").unwrap();
-                let mut name = d.get_string("name").unwrap();
-                let unit_name = units
-                    .iter()
-                    .find_map(|x| {
-                        (x.get_object_id("_id").unwrap() == u.get_object_id("unitId").unwrap())
-                            .then_some(x.get_str("name").unwrap())
-                    })
-                    .unwrap();
-                if loose_qty != 1 {
-                    name = format!("{} - {}", name, unit_name);
-                }
-                let id : i32 = postgres
-                .query_one(
-                    "INSERT INTO inventory 
-                    (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
-                        purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, manufacturer_name, 
-                        salts,loose_qty,category1) VALUES 
-                    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning id",
-                    &[
-                        &name,
-                        &division,
-                        &d.get_bool("allowNegativeStock").unwrap_or_default(),
-                        &d.get_str("tax").unwrap(),
-                        &primary_unit,
-                        &primary_unit,
-                        &primary_unit,
-                        &cess,
-                        &serde_json::json!({"mrp_editable": true, "tax_editable": true, "free_editable": true, "disc_1_editable": true, "disc_2_editable": true, "p_rate_editable": true, "s_rate_editable": true}),
-                        &serde_json::json!({"rate_editable": false, "tax_editable": false, "unit_editable": false, "disc_editable": false}),
-                        &barcodes,
-                        &d.get_str("hsnCode").ok(),
-                        &d.get_str("description").ok(),
-                        &manufacturer,
-                        &manufacturer_name,
-                        &(!salts.is_empty()).then_some(salts.clone()),
-                        &loose_qty,
-                        &category1
-                    ],
-                )
-                .await
-                .unwrap().get(0);
-                let mut b_ids = HashSet::new();
-                for br_de in d
-                    .get_array("branchDetails")
-                    .unwrap_or(&vec![])
-                    .iter()
-                    .map(|x| x.as_document().unwrap())
-                {
-                    let branch = branches.iter().find(|x| {
-                        x.get_object_id("_id").unwrap() == br_de.get_object_id("branch").unwrap()
-                    });
-                    if let Some(br) = branch {
-                        let branch_id = br._get_i32("postgres").unwrap();
-                        if b_ids.insert(branch_id) {
-                            let rack_id = br_de
-                                ._get_document("rack")
-                                .and_then(|x| x.get_object_id("id").ok());
-                            let mut rack_name = None;
-                            if let Some(rac) = rack_id {
-                                rack_name = racks.iter().find_map(|x| {
-                                    (x.get_object_id("_id").unwrap() == rac)
-                                        .then_some(x.get_string("displayName").unwrap())
-                                });
+                let has_stock = closing_batches.iter().any(|x| {
+                    x.get_object_id("inventory").unwrap() == object_id
+                        && loose_qty == x._get_i32("unitConv").unwrap()
+                });
+                if has_stock {
+                    let mut name = d.get_string("name").unwrap();
+                    let unit_name = units
+                        .iter()
+                        .find_map(|x| {
+                            (x.get_object_id("_id").unwrap() == u.get_object_id("unitId").unwrap())
+                                .then_some(x.get_str("name").unwrap())
+                        })
+                        .unwrap();
+                    if loose_qty != 1 {
+                        name = format!("{} - {}", name, unit_name);
+                    }
+                    let id : i32 = postgres
+                    .query_one(
+                        "INSERT INTO inventory 
+                        (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
+                            purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, manufacturer_name, 
+                            salts,loose_qty,category1) VALUES 
+                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning id",
+                        &[
+                            &name,
+                            &division,
+                            &d.get_bool("allowNegativeStock").unwrap_or_default(),
+                            &d.get_str("tax").unwrap(),
+                            &primary_unit,
+                            &primary_unit,
+                            &primary_unit,
+                            &cess,
+                            &serde_json::json!({"mrp_editable": true, "tax_editable": true, "free_editable": true, "disc_1_editable": true, "disc_2_editable": true, "p_rate_editable": true, "s_rate_editable": true}),
+                            &serde_json::json!({"rate_editable": false, "tax_editable": false, "unit_editable": false, "disc_editable": false}),
+                            &barcodes,
+                            &d.get_str("hsnCode").ok(),
+                            &d.get_str("description").ok(),
+                            &manufacturer,
+                            &manufacturer_name,
+                            &(!salts.is_empty()).then_some(salts.clone()),
+                            &loose_qty,
+                            &category1
+                        ],
+                    )
+                    .await
+                    .unwrap().get(0);
+                    let mut b_ids = HashSet::new();
+                    for br_de in d
+                        .get_array("branchDetails")
+                        .unwrap_or(&vec![])
+                        .iter()
+                        .map(|x| x.as_document().unwrap())
+                    {
+                        let branch = branches.iter().find(|x| {
+                            x.get_object_id("_id").unwrap()
+                                == br_de.get_object_id("branch").unwrap()
+                        });
+                        if let Some(br) = branch {
+                            let branch_id = br._get_i32("postgres").unwrap();
+                            if b_ids.insert(branch_id) {
+                                let rack_id = br_de
+                                    ._get_document("rack")
+                                    .and_then(|x| x.get_object_id("id").ok());
+                                let mut rack_name = None;
+                                if let Some(rac) = rack_id {
+                                    rack_name = racks.iter().find_map(|x| {
+                                        (x.get_object_id("_id").unwrap() == rac)
+                                            .then_some(x.get_string("displayName").unwrap())
+                                    });
+                                }
+                                if let Some(s_disc) = br_de
+                                    ._get_document("sDisc")
+                                    .and_then(|x| x._get_f64("amount"))
+                                {
+                                    postgres
+                                    .execute(
+                                    "INSERT INTO price_list_condition 
+                                    (apply_on, computation, price_list_id, value, inventory_id,branch_id) 
+                                    VALUES 
+                                    ('INVENTORY','DISCOUNT',1,$1,$2,$3)",
+                                    &[
+                                        &s_disc,
+                                        &id,
+                                        &branch_id
+                                    ],
+                                )
+                                .await
+                                .unwrap();
+                                }
+                                postgres
+                                .execute(
+                                    "INSERT INTO inventory_branch_detail 
+                                    (inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, stock_location_id) 
+                                    VALUES 
+                                    ($1,$2,$3,$4,$5,$6)",
+                                    &[
+                                        &id,
+                                        &name,
+                                        &branch_id,
+                                        &br.get_str("name").unwrap(),
+                                        &barcodes,
+                                        &rack_name
+                                    ],
+                                )
+                                .await
+                                .unwrap();
                             }
-                            let s_disc = br_de
-                                ._get_document("sDisc")
-                                .map(|x| serde_json::to_value(x).unwrap());
-                            postgres
-                            .execute(
-                                "INSERT INTO inventory_branch_detail 
-                                (inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, s_disc, stock_location_id) 
-                                VALUES 
-                                ($1,$2,$3,$4,$5,$6::JSON,$7)",
-                                &[
-                                    &id,
-                                    &name,
-                                    &branch_id,
-                                    &br.get_str("name").unwrap(),
-                                    &barcodes,
-                                    &s_disc,
-                                    &rack_name
-                                ],
-                            )
-                            .await
-                            .unwrap();
                         }
                     }
+                    updates.push(doc! {
+                        "q": { "inventory": object_id, "unitConv": loose_qty },
+                        "u": { "$set": { "postgres": id} },
+                        "multi": true
+                    });
                 }
-                updates.push(doc! {
-                    "q": { "inventory": object_id, "unitConv": loose_qty },
-                    "u": { "$set": { "postgres": id} },
-                    "multi": true
-                });
             }
         }
         if !updates.is_empty() {
