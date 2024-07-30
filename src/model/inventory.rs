@@ -8,7 +8,7 @@ impl Inventory {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         postgres
             .execute(
-                "INSERT INTO price_list (name) VALUES ('main price list')",
+                "INSERT INTO price_list (id, name) overriding system value VALUES (1, 'main price list')",
                 &[],
             )
             .await
@@ -152,14 +152,12 @@ impl Inventory {
                 salts.push(s);
             }
             let mut manufacturer = None;
-            let mut manufacturer_name = None;
             let mut category1 = None;
             if let Ok(id) = d.get_object_id("manufacturerId") {
                 manufacturer = manufacturers.iter().find_map(|x| {
                     (x.get_object_id("_id").unwrap() == id)
                         .then_some(x._get_i32("postgres").unwrap())
                 });
-                manufacturer_name = d.get_str("manufacturerName").ok();
             }
             if let Ok(id) = d.get_object_id("sectionId") {
                 category1 = sections.iter().find_map(|x| {
@@ -203,9 +201,9 @@ impl Inventory {
                     .query_one(
                         "INSERT INTO inventory 
                         (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
-                            purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, manufacturer_name, 
+                            purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, 
                             salts,loose_qty,category1) VALUES 
-                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning id",
+                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id",
                         &[
                             &name,
                             &division,
@@ -221,7 +219,6 @@ impl Inventory {
                             &d.get_str("hsnCode").ok(),
                             &d.get_str("description").ok(),
                             &manufacturer,
-                            &manufacturer_name,
                             &(!salts.is_empty()).then_some(salts.clone()),
                             &loose_qty,
                             &category1
@@ -230,6 +227,7 @@ impl Inventory {
                     .await
                     .unwrap().get(0);
                     let mut b_ids = HashSet::new();
+                    let mut disc_values = vec![];
                     for br_de in d
                         .get_array("branchDetails")
                         .unwrap_or(&vec![])
@@ -257,20 +255,7 @@ impl Inventory {
                                     ._get_document("sDisc")
                                     .and_then(|x| x._get_f64("amount"))
                                 {
-                                    postgres
-                                    .execute(
-                                    "INSERT INTO price_list_condition 
-                                    (apply_on, computation, price_list_id, value, inventory_id,branch_id) 
-                                    VALUES 
-                                    ('INVENTORY','DISCOUNT',1,$1,$2,$3)",
-                                    &[
-                                        &s_disc,
-                                        &id,
-                                        &branch_id
-                                    ],
-                                )
-                                .await
-                                .unwrap();
+                                    disc_values.push(s_disc);
                                 }
                                 postgres
                                 .execute(
@@ -294,9 +279,22 @@ impl Inventory {
                     }
                     updates.push(doc! {
                         "q": { "inventory": object_id, "unitConv": loose_qty },
-                        "u": { "$set": { "postgres": id} },
+                        "u": { "$set": { "postgres": id, "postgres_unit": primary_unit} },
                         "multi": true
                     });
+                    if !(disc_values.is_empty()) {
+                        let x = disc_values.into_iter().fold(f64::NEG_INFINITY, f64::max);
+                        postgres
+                            .execute(
+                                "INSERT INTO price_list_condition 
+                                    (apply_on, computation, price_list_id, value, inventory_id) 
+                                    VALUES 
+                                    ('INVENTORY','DISCOUNT',1,$1,$2)",
+                                &[&x, &id],
+                            )
+                            .await
+                            .unwrap();
+                    }
                 }
             }
         }

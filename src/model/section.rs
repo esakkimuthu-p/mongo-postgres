@@ -16,6 +16,13 @@ impl Section {
             .await
             .unwrap();
         let mut updates = Vec::new();
+        postgres
+            .execute(
+                "update category set category = 'Sections' where id = 'INV_CAT1'",
+                &[],
+            )
+            .await
+            .unwrap();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             let id: i32 = postgres

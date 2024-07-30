@@ -16,7 +16,7 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/velavanmeddemo"
+        default_value = "postgresql://postgres:1@localhost:5432/velavandemo"
     )]
     postgres: String,
 }
@@ -74,7 +74,7 @@ async fn main() {
     Unit::create(&mongodb, &client).await; //ok
     println!("Stock location start..");
     Rack::create(&mongodb, &client).await; //ok
-    println!("Stock location start..");
+    println!("Category start..");
     Section::create(&mongodb, &client).await; //ok
     println!("SaleIncharge start..");
     SaleIncharge::create(&mongodb, &client).await; //ok

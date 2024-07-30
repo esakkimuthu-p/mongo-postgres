@@ -83,13 +83,10 @@ impl Account {
             .unwrap();
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
-            let mut contact_type = "ACCOUNT";
             let mut bill_wise_detail = false;
             if d._get_i32("postgresAccountType").unwrap() == 16 {
-                contact_type = "CUSTOMER";
                 bill_wise_detail = true;
             } else if d._get_i32("postgresAccountType").unwrap() == 19 {
-                contact_type = "VENDOR";
                 bill_wise_detail = true;
             }
             let object_id = d.get_object_id("_id").unwrap();
@@ -101,7 +98,7 @@ impl Account {
                         name,alias_name,account_type_id,gst_tax_id,sac_code,
                         bill_wise_detail,contact_type, transaction_enabled
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, true) returning id",
+                    VALUES ($1, $2, $3, $4, $5, $6, 'ACCOUNT', true) returning id",
                     &[
                         &d.get_str("name").unwrap(),
                         &d.get_str("aliasName").ok(),
@@ -109,7 +106,6 @@ impl Account {
                         &d.get_str("tax").ok(),
                         &d.get_str("sacCode").ok(),
                         &bill_wise_detail,
-                        &contact_type,
                     ],
                 )
                 .await

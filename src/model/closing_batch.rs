@@ -1,4 +1,4 @@
-use mongodb::IndexModel;
+use mongodb::{options::AggregateOptions, IndexModel};
 
 use super::*;
 
@@ -10,25 +10,19 @@ impl InventoryBranchBatch {
             .collection::<Document>("batches")
             .aggregate(vec![
                 doc!{ "$match": { "$expr" : { "$ne" : [ "$inward", "$outward" ] }}},
-                doc!{"$lookup": {
-                    "from": "units",
-                    "localField": "unitId",
-                    "foreignField": "_id",
-                    "as": "unit"
-                }},
                 doc!{
                     "$project": {
-                        "closing": { "$subtract": ["$inward", "$outward"] },
                         "inventory": 1, "branch": 1, "sRate": {"$round": ["$sRate", 2]}, "mrp": {"$round": ["$mrp", 2]}, "pRate": {"$round": ["$pRate", 2]},
-                        "unit": {"$arrayElemAt": ["$unit.postgres", 0]},
                         "batchNo": 1, "expiry": 1,"avgNlc": 1,
-                        "qty": { "$round": [{ "$divide": [{ "$subtract": ["$inward", "$outward"] }, "$unitConv"] }, 4] },
-                        "is_loose_qty": { "$cond": [{ "$gt": ["$unitConv", 1] }, false, true] },
+                        "qty": { "$round": [{ "$subtract": ["$inward", "$outward"] }, 4] },
+                        "is_loose_qty": {"$literal": true},
                         "unitConv":1,
                     }
                 },
                 doc!{ "$out": "closing_batches"}
-            ], None)
+            ], 
+            AggregateOptions::builder().allow_disk_use(true).build(),
+            )
             .await
             .unwrap()
             .try_collect::<Vec<Document>>()
@@ -52,13 +46,14 @@ impl InventoryBranchBatch {
                         "$group": {
                             "_id": {"branch": "$branch", "postgres": "$postgres"},
                             "inv_items": {"$push": {
+                               "sno": 1,
                                "qty": "$qty",
-                               "nlc": {"$ifNull": ["$avgNlc", {"$ifNull": ["$pRate", 0.0]}]},
-                               "cost": {"$ifNull": ["$avgNlc", {"$ifNull": ["$pRate", 0.0]}]},
-                               "unit_id": "$unit",
+                               "nlc": {"$ifNull": ["$avgNlc", {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, 0.0]}]},
+                               "cost": {"$ifNull": ["$avgNlc", {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, 0.0]}]},
+                               "unit_id": "$postgres_unit",
                                "unit_conv": 1,
                                "is_loose_qty": "$is_loose_qty",
-                               "rate": {"$ifNull": ["$pRate", {"$ifNull": ["$avgNlc", 0.0]}]},
+                               "rate": {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, {"$ifNull": ["$avgNlc", 0.0]}]},
                                "batch_no": "$batchNo",
                                "mrp": "$mrp",
                                "s_rate": "$sRate",
@@ -84,7 +79,7 @@ impl InventoryBranchBatch {
                     },
                     doc! { "$out": "inv_opening"},
                 ],
-                None,
+                AggregateOptions::builder().allow_disk_use(true).build(),
             )
             .await
             .unwrap();
