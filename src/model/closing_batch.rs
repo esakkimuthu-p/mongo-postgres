@@ -12,10 +12,10 @@ impl InventoryBranchBatch {
                 doc!{ "$match": { "$expr" : { "$ne" : [ "$inward", "$outward" ] }}},
                 doc!{
                     "$project": {
-                        "inventory": 1, "branch": 1, "sRate": {"$round": ["$sRate", 2]}, "mrp": {"$round": ["$mrp", 2]}, "pRate": {"$round": ["$pRate", 2]},
+                        "inventory": 1, "branch": 1, "sRate": {"$round": ["$sRate", 2]}, "mrp": {"$round": ["$mrp", 2]},
+                        "rate": {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, {"$ifNull": ["$avgNlc", 0.0]}]},
                         "batchNo": 1, "expiry": 1,"avgNlc": 1,
                         "qty": { "$round": [{ "$subtract": ["$inward", "$outward"] }, 4] },
-                        "is_loose_qty": {"$literal": true},
                         "unitConv":1,
                     }
                 },
@@ -52,8 +52,8 @@ impl InventoryBranchBatch {
                                "cost": {"$ifNull": ["$avgNlc", {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, 0.0]}]},
                                "unit_id": "$postgres_unit",
                                "unit_conv": 1,
-                               "is_loose_qty": "$is_loose_qty",
-                               "rate": {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, {"$ifNull": ["$avgNlc", 0.0]}]},
+                               "is_loose_qty": {"$literal": true},
+                               "rate": "$rate",
                                "batch_no": "$batchNo",
                                "mrp": "$mrp",
                                "s_rate": "$sRate",

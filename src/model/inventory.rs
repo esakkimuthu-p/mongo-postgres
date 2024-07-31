@@ -304,6 +304,11 @@ impl Inventory {
                 "updates": &updates
             };
             mongodb.run_command(command, None).await.unwrap();
+            let command = doc! {
+                "update": "vendor_item_mappings",
+                "updates": &updates
+            };
+            mongodb.run_command(command, None).await.unwrap();
         }
     }
 }

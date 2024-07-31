@@ -26,6 +26,7 @@ impl Contact {
             )
             .await
             .unwrap();
+        let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
             let account = accounts.iter().find_map(|x| {
                 (x.get_object_id("_id").unwrap()
@@ -75,9 +76,10 @@ impl Contact {
                 "EMPLOYEE" => ("EMPLOYEE", 19),
                 _ => panic!("Invalid contact type"),
             };
+            let id: i32;
             if let Some(acc) = account {
-                postgres
-                .execute(
+                id = postgres
+                .query_one(
                         "update account set short_name = $2,pan_no = $3,aadhar_no = $4,gst_reg_type = $5,gst_location_id=$6,gst_no=$7,
                             mobile=$8,alternate_mobile=$9,email=$10,telephone=$11,contact_person=$12,address=$13,
                             city=$14,pincode=$15,state_id=$16,country_id=$17, contact_type = $18, name = $19 where id = $1",
@@ -104,17 +106,18 @@ impl Contact {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap()
+                .get(0);
             } else {
-                postgres
-                .execute(
+                id =  postgres
+                .query_one(
                         "INSERT INTO account 
                         (name,short_name,pan_no,aadhar_no,gst_reg_type,gst_location_id,gst_no,
                             mobile,alternate_mobile,email,telephone,contact_person,address,
                             city,pincode,state_id,country_id, contact_type, account_type_id,transaction_enabled) 
                     VALUES 
                         ($1,$2,$3,$4,$5::text,$6,$7,$8,$9,$10,$11,
-                        $12,$13,$14,$15,$16,$17,$18::text,$19,false)",
+                        $12,$13,$14,$15,$16,$17,$18::text,$19,false) returning id",
                     &[
 
                         &d.get_str("name").unwrap(),
@@ -139,8 +142,28 @@ impl Contact {
                     ],
                 )
                 .await
-                .unwrap();
+                .unwrap()
+                .get(0);
             }
+            if contact_type == "VENDOR" {
+                updates.push(doc! {
+                    "q": { "vendor": d.get_object_id("_id").unwrap() },
+                    "u": { "$set": { "postgres_vendor": id} },
+                    "multi": true
+                });
+            }
+        }
+        if !updates.is_empty() {
+            let command = doc! {
+                "update": "vendor_bill_mappings",
+                "updates": &updates
+            };
+            mongodb.run_command(command, None).await.unwrap();
+            let command = doc! {
+                "update": "vendor_item_mappings",
+                "updates": &updates
+            };
+            mongodb.run_command(command, None).await.unwrap();
         }
     }
 }
