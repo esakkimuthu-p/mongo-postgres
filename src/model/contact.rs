@@ -82,7 +82,7 @@ impl Contact {
                 .query_one(
                         "update account set short_name = $2,pan_no = $3,aadhar_no = $4,gst_reg_type = $5,gst_location_id=$6,gst_no=$7,
                             mobile=$8,alternate_mobile=$9,email=$10,telephone=$11,contact_person=$12,address=$13,
-                            city=$14,pincode=$15,state_id=$16,country_id=$17, contact_type = $18, name = $19 where id = $1",
+                            city=$14,pincode=$15,state_id=$16,country_id=$17, contact_type = $18, name = $19 where id = $1 returning id",
                     &[
                         &acc,
                         &d.get_str("shortName").ok(),

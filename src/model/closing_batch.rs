@@ -48,15 +48,15 @@ impl InventoryBranchBatch {
                             "inv_items": {"$push": {
                                "sno": 1,
                                "qty": "$qty",
-                               "nlc": {"$ifNull": ["$avgNlc", {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, 0.0]}]},
-                               "cost": {"$ifNull": ["$avgNlc", {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, 0.0]}]},
+                               "nlc": {"$ifNull": ["$avgNlc", {"$ifNull": ["$rate", 0.0]}]},
+                               "cost": {"$ifNull": ["$avgNlc", {"$ifNull": ["$rate", 0.0]}]},
                                "unit_id": "$postgres_unit",
                                "unit_conv": 1,
                                "is_loose_qty": {"$literal": true},
-                               "rate": "$rate",
+                               "rate": {"$round": ["$rate", 2]},
                                "batch_no": "$batchNo",
-                               "mrp": "$mrp",
-                               "s_rate": "$sRate",
+                               "mrp": {"$round": ["$mrp", 2]},
+                               "s_rate": {"$round": ["$sRate", 2]},
                                "expiry": "$expiry",
                                "asset_amount":{"$round": [{"$multiply": ["$avgNlc", "$qty"]}, 2]}
                             }}
