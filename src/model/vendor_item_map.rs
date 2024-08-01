@@ -64,7 +64,7 @@ impl VendorBillItem {
                         &item_map.get_string("mrp").unwrap_or_default(),
                         &item_map.get_string("rate").unwrap_or_default(),
                         &item_map.get_string("free"),
-                        &item_map.get_string("batch_no"),
+                        &item_map.get_string("batchNo"),
                         &exp,
                         &exp_format,
                         &item_map.get_string("discount").unwrap_or_default(),
