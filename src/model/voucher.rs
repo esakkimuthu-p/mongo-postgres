@@ -105,7 +105,7 @@ impl Voucher {
             .unwrap();
         postgres
             .execute(
-                "ALTER TABLE voucher DISABLE TRIGGER gen_voucher_no_for_voucher",
+                "ALTER TABLE voucher DISABLE TRIGGER tg_gen_voucher_no_for_voucher",
                 &[],
             )
             .await
@@ -426,7 +426,7 @@ $$ language plpgsql;",
         }
         postgres
             .execute(
-                "ALTER TABLE voucher ENABLE TRIGGER gen_voucher_no_for_voucher",
+                "ALTER TABLE voucher ENABLE TRIGGER tg_gen_voucher_no_for_voucher",
                 &[],
             )
             .await
