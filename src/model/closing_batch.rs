@@ -20,7 +20,7 @@ impl InventoryBranchBatch {
                     }
                 },
                 doc!{ "$out": "closing_batches"}
-            ], 
+            ],
             AggregateOptions::builder().allow_disk_use(true).build(),
             )
             .await

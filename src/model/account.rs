@@ -83,12 +83,7 @@ impl Account {
             .unwrap();
         let mut updates = Vec::new();
         while let Some(Ok(d)) = cur.next().await {
-            let mut bill_wise_detail = false;
-            if d._get_i32("postgresAccountType").unwrap() == 16 {
-                bill_wise_detail = true;
-            } else if d._get_i32("postgresAccountType").unwrap() == 19 {
-                bill_wise_detail = true;
-            }
+            let bill_wise_detail = [16, 19].contains(&d._get_i32("postgresAccountType").unwrap());
             let object_id = d.get_object_id("_id").unwrap();
 
             let id: i32 = postgres
