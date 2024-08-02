@@ -310,5 +310,12 @@ impl Inventory {
             };
             mongodb.run_command(command, None).await.unwrap();
         }
+        postgres
+            .execute(
+                "delete from unit u where u.id not in (select distinct unit_id from inventory)",
+                &[],
+            )
+            .await
+            .unwrap();
     }
 }
