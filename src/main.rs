@@ -16,9 +16,11 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/velavanmeddemo"
+        default_value = "postgresql://postgres:1@localhost:5432/velavanmedical"
     )]
     postgres: String,
+    #[clap(short, long, default_value = "aplus@123$")]
+    jwt_private_key: String,
 }
 
 #[tokio::main]
@@ -41,7 +43,7 @@ async fn main() {
         .unwrap();
     println!("START***{}****", &mongodb.name());
     println!("Member start..");
-    Member::create(&mongodb, &client).await;
+    Member::create(&mongodb, &client, &args.jwt_private_key).await;
     println!("FinancialYear start..");
     FinancialYear::create(&mongodb, &client).await;
     println!("TdsNatureOfPayment start..");

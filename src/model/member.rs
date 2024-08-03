@@ -3,7 +3,7 @@ use super::*;
 pub struct Member;
 
 impl Member {
-    pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
+    pub async fn create(mongodb: &Database, postgres: &PostgresClient, jwt: &String) {
         let mut cur = mongodb
             .collection::<Document>("members")
             .find(
@@ -16,6 +16,14 @@ impl Member {
             .await
             .unwrap();
         let mut updates = Vec::new();
+        let js = serde_json::json!({"jwt_private_key": jwt});
+        postgres
+            .execute(
+                "select set_config('app.env',($1)::json::text,false)",
+                &[&js],
+            )
+            .await
+            .unwrap();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             let id: i32 = postgres
