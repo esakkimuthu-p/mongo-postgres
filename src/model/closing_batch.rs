@@ -52,7 +52,7 @@ impl InventoryBranchBatch {
                                "cost": {"$ifNull": ["$avgNlc", {"$ifNull": ["$rate", 0.0]}]},
                                "unit_id": "$postgres_unit",
                                "unit_conv": 1,
-                               "is_loose_qty": {"$literal": true},
+                               "is_retail_qty": {"$literal": true},
                                "rate": {"$round": ["$rate", 2]},
                                "batch_no": "$batchNo",
                                "mrp": {"$round": ["$mrp", 2]},

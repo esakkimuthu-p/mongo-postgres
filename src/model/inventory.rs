@@ -180,10 +180,10 @@ impl Inventory {
                 })
                 .unwrap();
             for u in inv_units {
-                let loose_qty = u._get_i32("conversion").unwrap();
+                let retail_qty = u._get_i32("conversion").unwrap();
                 let has_stock = closing_batches.iter().any(|x| {
                     x.get_object_id("inventory").unwrap() == object_id
-                        && loose_qty == x._get_i32("unitConv").unwrap()
+                        && retail_qty == x._get_i32("unitConv").unwrap()
                 });
                 if has_stock {
                     let mut name = d.get_string("name").unwrap();
@@ -194,7 +194,7 @@ impl Inventory {
                                 .then_some(x.get_str("name").unwrap())
                         })
                         .unwrap();
-                    if loose_qty != 1 {
+                    if retail_qty != 1 {
                         name = format!("{} - {}", name, unit_name);
                     }
                     let id : i32 = postgres
@@ -202,7 +202,7 @@ impl Inventory {
                         "INSERT INTO inventory 
                         (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
                             purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, 
-                            salts,loose_qty,category1) VALUES 
+                            salts,retail_qty,category1) VALUES 
                         ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id",
                         &[
                             &name,
@@ -220,7 +220,7 @@ impl Inventory {
                             &d.get_str("description").ok(),
                             &manufacturer,
                             &(!salts.is_empty()).then_some(salts.clone()),
-                            &loose_qty,
+                            &retail_qty,
                             &category1
                         ],
                     )
@@ -278,7 +278,7 @@ impl Inventory {
                         }
                     }
                     updates.push(doc! {
-                        "q": { "inventory": object_id, "unitConv": loose_qty },
+                        "q": { "inventory": object_id, "unitConv": retail_qty },
                         "u": { "$set": { "postgres": id, "postgres_unit": primary_unit} },
                         "multi": true
                     });
