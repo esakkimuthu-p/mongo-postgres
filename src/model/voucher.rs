@@ -110,16 +110,41 @@ impl Voucher {
             )
             .await
             .unwrap();
+        postgres.execute("create or replace function insert_bank_allocation(voucher, jsonb, ac_txn)
+    returns bool as
+$$
+declare
+    alt_acc account;
+    i       json;
+    _sno    smallint := 1;
+begin
+    for i in select jsonb_array_elements($2)
+        loop
+            select * into alt_acc from account where id = (i ->> 'account_id')::int;
+            insert into bank_txn (id, sno, ac_txn_id, date, inst_date, inst_no, in_favour_of, is_memo, amount,
+                                  account_id, account_name, base_account_types, alt_account_id, alt_account_name,
+                                  particulars, branch_id, branch_name, voucher_id, voucher_no, base_voucher_type,
+                                  bank_beneficiary_id, txn_type, bank_date)
+            values (coalesce((i ->> 'id')::uuid, gen_random_uuid()), _sno, $3.id, $1.date, (i ->> 'inst_date')::date,
+                    (i ->> 'inst_no')::text, (i ->> 'in_favour_of')::text, $3.is_memo, (i ->> 'amount')::float,
+                    $3.account_id, $3.account_name, $3.base_account_types, alt_acc.id, alt_acc.name,
+                    (i ->> 'particulars')::text, $1.branch_id, $1.branch_name, $1.id, $1.voucher_no,
+                    $1.base_voucher_type, (i ->> 'bank_beneficiary_id')::int, (i ->> 'txn_type')::text,
+                    (i ->> 'bank_date')::date);
+            _sno = _sno + 1;
+        end loop;
+    return true;
+end;
+$$ language plpgsql;", &[]).await.unwrap();
         postgres
             .execute(
-                "create or replace function create_voucher_via_script(json, uuid default null)
+                "create or replace function create_voucher_via_script(json)
     returns bool
 as
 $$
 declare
     v_voucher voucher;
     first_txn json := (($1 ->> 'ac_trns')::jsonb)[0];
-    _res      bool;
 begin
     insert into voucher (date, branch_id, branch_name, voucher_type_id, branch_gst, party_gst, eff_date, mode, lut, rcm,
                          ref_no, party_id, credit, debit, description, amount, e_invoice_details, voucher_seq,
@@ -132,13 +157,10 @@ begin
             (first_txn ->> 'credit')::float, (first_txn ->> 'debit')::float, ($1 ->> 'description')::text,
             ($1 ->> 'amount')::float, ($1 ->> 'e_invoice_details')::jsonb, ($1 ->> 'voucher_seq')::int,
             ($1 ->> 'voucher_prefix')::text, ($1 ->> 'voucher_fy')::int, ($1 ->> 'voucher_no')::text,
-            ($1 ->> 'base_voucher_type')::text, coalesce($2, gen_random_uuid()))
+            ($1 ->> 'base_voucher_type')::text, gen_random_uuid())
     returning * into v_voucher;
-    if jsonb_array_length(coalesce(($1 ->> 'tds_details')::jsonb, '[]'::jsonb)) > 0 then
-        select * into _res from apply_tds_on_voucher(v_voucher, ($1 ->> 'tds_details')::jsonb);
-    end if;
     if jsonb_array_length(coalesce(($1 ->> 'ac_trns')::jsonb, '[]'::jsonb)) > 0 then
-        select * into _res from insert_ac_txn(v_voucher, ($1 ->> 'ac_trns')::jsonb);
+        perform insert_ac_txn(v_voucher, ($1 ->> 'ac_trns')::jsonb);
     end if;
     return true;
 end;
@@ -329,7 +351,7 @@ $$ language plpgsql;",
                         bk.push(json!({
                             "amount": trn._get_f64("debit").unwrap() - trn._get_f64("credit").unwrap(),
                             "txn_type": "CASH",
-                            "account": account,
+                            "account_id": account,
                             "bank_date": bank_date
                         }));
                     }
@@ -435,5 +457,30 @@ $$ language plpgsql;",
             .execute("drop function if exists create_voucher_via_script", &[])
             .await
             .unwrap();
+        postgres.execute("create or replace function insert_bank_allocation(voucher, jsonb, ac_txn)
+    returns bool as
+$$
+declare
+    alt_acc account;
+    i       json;
+    _sno    smallint := 1;
+begin
+    for i in select jsonb_array_elements($2)
+        loop
+            select * into alt_acc from account where id = (i ->> 'account_id')::int;
+            insert into bank_txn (id, sno, ac_txn_id, date, inst_date, inst_no, in_favour_of, is_memo, amount,
+                                  account_id, account_name, base_account_types, alt_account_id, alt_account_name,
+                                  particulars, branch_id, branch_name, voucher_id, voucher_no, base_voucher_type,
+                                  bank_beneficiary_id, txn_type)
+            values (coalesce((i ->> 'id')::uuid, gen_random_uuid()), _sno, $3.id, $1.date, (i ->> 'inst_date')::date,
+                    (i ->> 'inst_no')::text, (i ->> 'in_favour_of')::text, $3.is_memo, (i ->> 'amount')::float,
+                    $3.account_id, $3.account_name, $3.base_account_types, alt_acc.id, alt_acc.name,
+                    (i ->> 'particulars')::text, $1.branch_id, $1.branch_name, $1.id, $1.voucher_no,
+                    $1.base_voucher_type, (i ->> 'bank_beneficiary_id')::int, (i ->> 'txn_type')::text);
+            _sno = _sno + 1;
+        end loop;
+    return true;
+end;
+$$ language plpgsql;", &[]).await.unwrap();
     }
 }
