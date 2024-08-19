@@ -143,17 +143,19 @@ $$ language plpgsql;", &[]).await.unwrap();
 as
 $$
 declare
-    v_voucher voucher;
-    first_txn json := (($1 ->> 'ac_trns')::jsonb)[0];
+    v_voucher   voucher;
+    first_txn   json := (($1 ->> 'ac_trns')::jsonb)[0];
+    _party_name text := (select name
+                         from account
+                         where id = (first_txn ->> 'account_id')::int);
 begin
     insert into voucher (date, branch_id, branch_name, voucher_type_id, branch_gst, party_gst, eff_date, mode, lut, rcm,
-                         ref_no, party_id, credit, debit, description, amount, e_invoice_details, voucher_seq,
-                         voucher_prefix, voucher_fy, voucher_no, base_voucher_type, session)
+                         ref_no, party_id, party_name, credit, debit, description, amount, e_invoice_details,
+                         voucher_seq, voucher_prefix, voucher_fy, voucher_no, base_voucher_type, session)
     values (($1 ->> 'date')::date, ($1 ->> 'branch_id')::int, ($1 ->> 'branch_name')::text,
             ($1 ->> 'voucher_type_id')::int, ($1 ->> 'branch_gst')::json, ($1 ->> 'party_gst')::json,
             ($1 ->> 'eff_date')::date, coalesce(($1 ->> 'mode')::text, 'ACCOUNT'), ($1 ->> 'lut')::bool,
-            ($1 ->> 'rcm')::bool, ($1 ->> 'ref_no')::text,
-            coalesce(($1 ->> 'party_id')::int, (first_txn ->> 'account_id')::int),
+            ($1 ->> 'rcm')::bool, ($1 ->> 'ref_no')::text, (first_txn ->> 'account_id')::int, _party_name,
             (first_txn ->> 'credit')::float, (first_txn ->> 'debit')::float, ($1 ->> 'description')::text,
             ($1 ->> 'amount')::float, ($1 ->> 'e_invoice_details')::jsonb, ($1 ->> 'voucher_seq')::int,
             ($1 ->> 'voucher_prefix')::text, ($1 ->> 'voucher_fy')::int, ($1 ->> 'voucher_no')::text,
@@ -408,11 +410,6 @@ $$ language plpgsql;",
                     }
                     ac_trns.push(ac_trn);
                 }
-                let desc = format!(
-                    "{} OLD-NO: {}",
-                    d.get_str("description").unwrap_or_default(),
-                    d.get_string("voucherNo").unwrap()
-                );
                 let data = serde_json::json!({
                    "date": &d.get_string("date").unwrap(),
                    "eff_date": &d.get_string("effDate"),
@@ -420,14 +417,14 @@ $$ language plpgsql;",
                     "voucher_type_id": &voucher_type,
                     "mode": "ACCOUNT",
                     "ref_no": &d.get_string("refNo"),
-                   "description": &desc,
+                   "description": &d.get_string("description"),
                    "ac_trns": &serde_json::to_value(ac_trns).unwrap(),
                    "amount": &amount,
                     "lut": &d.get_bool("lut").ok(),
                     "rcm": &d.get_bool("rcm").ok(),
                    "branch_name": &branch_name,
                    "base_voucher_type": &base_voucher_type,
-                "voucher_prefix": &voucher_no.0,
+                    "voucher_prefix": &voucher_no.0,
                    "voucher_fy": &voucher_no.1,
                    "voucher_seq": &voucher_no.2,
                    "voucher_no": &d.get_string("voucherNo").unwrap(),

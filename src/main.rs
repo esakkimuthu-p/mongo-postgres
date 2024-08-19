@@ -81,7 +81,6 @@ async fn main() {
     println!("SaleIncharge start..");
     SaleIncharge::create(&mongodb, &client).await;
     println!("DesktopClient start..");
-    // DesktopClient::create(&mongodb, &client).await;
     println!("Salt create start..");
     Salt::create(&mongodb, &client).await;
     println!("InventoryBranchBatch create start..");
@@ -96,5 +95,7 @@ async fn main() {
     VendorBillItem::create_item_map(&mongodb, &client).await;
     println!("Vendor create_bill_map start..");
     VendorBillItem::create_bill_map(&mongodb, &client).await;
+    println!("call day_end_process start..");
+    client.execute("call day_end_process()", &[]).await.unwrap();
     println!("END***{}****", &mongodb.name());
 }
