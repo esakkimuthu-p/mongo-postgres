@@ -141,6 +141,15 @@ impl Inventory {
                 })
                 .ok();
             let mut salts = Vec::new();
+            if d.get_bool("scheduleH").unwrap_or_default() {
+                salts.push(1);
+            }
+            if d.get_bool("scheduleH1").unwrap_or_default() {
+                salts.push(2);
+            }
+            if d.get_bool("narcotics").unwrap_or_default() {
+                salts.push(3);
+            }
             for b in d.get_array("salts").unwrap_or(&vec![]) {
                 let s = pharma_salts
                     .iter()
@@ -202,7 +211,7 @@ impl Inventory {
                         "INSERT INTO inventory 
                         (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
                             purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, 
-                            salts,retail_qty,category1) VALUES 
+                            tags,retail_qty,category1) VALUES 
                         ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id",
                         &[
                             &name,

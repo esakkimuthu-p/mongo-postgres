@@ -5,21 +5,24 @@ pub struct Salt;
 impl Salt {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
-            .collection::<Document>("salts")
+            .collection::<Document>("pharma_salts")
             .find(doc! {}, None)
             .await
             .unwrap();
         let mut updates = Vec::new();
+        postgres
+            .execute(
+                "insert into tag (name) values ('Schedule H'), ('Schedule H1'), ('Narcotics');",
+                &[],
+            )
+            .await
+            .unwrap();
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
-            let drug = d
-                .get_string("h")
-                .or(d.get_string("h1"))
-                .or(d.get_string("nc"));
             let id: i32 = postgres
                 .query_one(
-                    "INSERT INTO pharma_salt (name, drug_category) VALUES ($1,$2) returning id",
-                    &[&d.get_str("name").unwrap(), &drug],
+                    "INSERT INTO tag (name) VALUES ($1) returning id",
+                    &[&d.get_str("name").unwrap()],
                 )
                 .await
                 .unwrap()
