@@ -406,7 +406,7 @@ $$ language plpgsql;",
                             "cgst_amount": cgst_amount,
                             "igst_amount": igst_amount,
                         });
-                        ac_trn["gst_tax_info"] = json!(gst_tax_info);
+                        ac_trn["gst_info"] = json!(gst_tax_info);
                     }
                     ac_trns.push(ac_trn);
                 }
