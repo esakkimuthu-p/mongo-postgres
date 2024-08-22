@@ -82,7 +82,7 @@ impl Member {
                 .query_one(
                     "INSERT INTO member
                         (name,user_id, pass,nick_name,remote_access, is_root, role_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, 'custom') returning id",
+                    VALUES ($1, $2, $3, $4, $5, $6, 'sale') returning id",
                     &[
                         &d.get_str("username").unwrap(),
                         &d.get_object_id("user").ok().map(|x| x.to_hex()),
