@@ -16,7 +16,7 @@ struct Args {
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/velavanmeddemo"
+        default_value = "postgresql://postgres:1@localhost:5432/velavanmedical"
     )]
     postgres: String,
     #[clap(short, long, default_value = "aplus@123$")]

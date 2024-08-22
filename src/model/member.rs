@@ -1,3 +1,5 @@
+use serde_json::json;
+
 use super::*;
 
 pub struct Member;
@@ -17,10 +19,32 @@ impl Member {
             .unwrap();
         let mut updates = Vec::new();
         let js = serde_json::json!({"jwt_private_key": jwt});
+        let perms = vec!["member_role__select", "bank_beneficiary__select"];
+        let ui_perms = json!([
+            "adm.role.vw",
+            "adm.role.cr",
+            "adm.role.up",
+            "inv.inv.vw",
+            "inv.inv.cr",
+            "inv.inv.up",
+            "rpt.sltg",
+            "inv.sb.vw",
+            "inv.sb.cr",
+            "rpt.sls.slreg",
+            "inv.sb.up"
+        ]);
         postgres
             .execute(
                 "select set_config('app.env',($1)::json::text,false)",
                 &[&js],
+            )
+            .await
+            .unwrap();
+        postgres
+            .execute(
+                "insert into member_role(name, perms, ui_perms)
+                values ('custom', $1::text[], $2::json)",
+                &[&perms, &ui_perms],
             )
             .await
             .unwrap();
@@ -30,7 +54,7 @@ impl Member {
                 .query_one(
                     "INSERT INTO member
                         (name,user_id, pass,nick_name,remote_access, is_root, role_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, 'admin') returning id",
+                    VALUES ($1, $2, $3, $4, $5, $6, 'custom') returning id",
                     &[
                         &d.get_str("username").unwrap(),
                         &d.get_object_id("user").ok().map(|x| x.to_hex()),
