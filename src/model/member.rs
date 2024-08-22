@@ -19,19 +19,47 @@ impl Member {
             .unwrap();
         let mut updates = Vec::new();
         let js = serde_json::json!({"jwt_private_key": jwt});
-        let perms = vec!["member_role__select", "bank_beneficiary__select"];
+        let perms = vec![
+            "doctor__insert",
+            "account__insert",
+            "bank_beneficiary__select",
+            "sale_bill__select",
+            "get_gift_voucher__execute",
+            "create_sale_bill__execute",
+            "get_sale_bill__execute",
+            "exchange__select",
+            "customer_sale_history__select",
+            "vw_recent_sale_bill__select",
+            "price_list__select",
+            "price_list_condition__select",
+            "offer_management__select",
+            "doctor__select",
+            "e_invoice_proxy__execute",
+            "set_e_invoice_irn_details__call",
+            "gift_coupon__select",
+            "create_stock_deduction__execute",
+            "stock_deduction__select",
+            "get_stock_deduction__execute",
+            "inventory_branch_detail__select",
+            "batch__select",
+            "batch__update",
+            "get_voucher__execute",
+            "create_voucher__execute",
+            "account_pending__select",
+            "inventory__select",
+            "account__select",
+        ];
         let ui_perms = json!([
-            "adm.role.vw",
-            "adm.role.cr",
-            "adm.role.up",
-            "inv.inv.vw",
-            "inv.inv.cr",
-            "inv.inv.up",
-            "rpt.sltg",
+            "inv.cus.vw",
+            "inv.cus.cr",
+            "ac.ac.vw",
+            "ac.ac.cr",
+            "inv.doc.vw",
+            "inv.doc.cr",
+            "ac.pmt.cr",
             "inv.sb.vw",
             "inv.sb.cr",
-            "rpt.sls.slreg",
-            "inv.sb.up"
+            "inv.stkded.cr"
         ]);
         postgres
             .execute(
