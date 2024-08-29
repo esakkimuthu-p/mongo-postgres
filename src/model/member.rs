@@ -5,7 +5,7 @@ use super::*;
 pub struct Member;
 
 impl Member {
-    pub async fn create(mongodb: &Database, postgres: &PostgresClient, jwt: &String) {
+    pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         let mut cur = mongodb
             .collection::<Document>("members")
             .find(
@@ -61,13 +61,6 @@ impl Member {
             "inv.sb.cr",
             "inv.stkded.cr"
         ]);
-        postgres
-            .execute(
-                "select set_config('app.env',($1)::json::text,false)",
-                &[&js],
-            )
-            .await
-            .unwrap();
         postgres
             .execute(
                 "insert into member_role(name, perms, ui_perms)
