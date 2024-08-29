@@ -71,7 +71,7 @@ impl Member {
         postgres
             .execute(
                 "insert into member_role(name, perms, ui_perms)
-                values ('custom', $1::text[], $2::json)",
+                values ('sale', $1::text[], $2::json)",
                 &[&perms, &ui_perms],
             )
             .await
