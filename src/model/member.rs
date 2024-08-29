@@ -18,7 +18,6 @@ impl Member {
             .await
             .unwrap();
         let mut updates = Vec::new();
-        let js = serde_json::json!({"jwt_private_key": jwt});
         let perms = vec![
             "doctor__insert",
             "account__insert",
