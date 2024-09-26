@@ -1,4 +1,4 @@
-use mongodb::{options::AggregateOptions, IndexModel};
+use mongodb::{bson::oid::ObjectId, options::AggregateOptions, IndexModel};
 
 use super::*;
 
@@ -16,7 +16,7 @@ impl InventoryBranchBatch {
                         "rate": {"$ifNull": [{"$divide": ["$pRate","$unitConv"]}, {"$ifNull": ["$avgNlc", 0.0]}]},
                         "batchNo": 1, "expiry": 1,"avgNlc": 1,
                         "qty": { "$round": [{ "$subtract": ["$inward", "$outward"] }, 4] },
-                        "unitConv":1,
+                        "unitConv":{"$ifNull": ["$unitConv", 1.0]},
                     }
                 },
                 doc!{ "$out": "closing_batches"}
@@ -36,12 +36,50 @@ impl InventoryBranchBatch {
             .create_index(idx, None)
             .await
             .unwrap();
+        let x = mongodb
+            .collection::<Document>("closing_batches")
+            .aggregate(
+                vec![
+                    doc! { "$match": { "qty": { "$lt": 0 } } },
+                    doc! {
+                        "$group": {
+                            "_id":null,
+                            "ids": {"$addToSet": "$inventory"},
+                        }
+                    },
+                ],
+                AggregateOptions::builder().allow_disk_use(true).build(),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap();
+        let y = x.first().map(|z| {
+            z.get_array("ids").map(|p| {
+                p.iter()
+                    .filter_map(|q| q.as_object_id())
+                    .collect::<Vec<ObjectId>>()
+            })
+        });
+        if let Some(Ok(a)) = y {
+            mongodb
+                .collection::<Document>("inventories")
+                .update_many(
+                    doc! {"_id": {"$in": a}},
+                    doc! {"$set": {"allowNegativeStock": true}},
+                    None,
+                )
+                .await
+                .unwrap();
+        }
     }
     pub async fn opening(mongodb: &Database, postgres: &PostgresClient) {
         mongodb
             .collection::<Document>("closing_batches")
             .aggregate(
                 vec![
+                    doc! {"$match": {"postgres": {"$exists": true}}},
                     doc! {
                         "$group": {
                             "_id": {"branch": "$branch", "postgres": "$postgres"},
