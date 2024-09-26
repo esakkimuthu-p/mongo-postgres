@@ -9,14 +9,14 @@ use model::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// mongodb Organization cluster MONGO-URI.
-    #[clap(short, long, default_value = "mongodb://localhost:27017/velavanmed")]
+    #[clap(short, long, default_value = "mongodb://localhost:27017/mamedicals")]
     mongodb: String,
 
     /// postgres Organization HOST.
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/velavanmedical"
+        default_value = "postgresql://postgres:1@localhost:55432/mamedicals"
     )]
     postgres: String,
 }
@@ -92,7 +92,16 @@ async fn main() {
     VendorBillItem::create_item_map(&mongodb, &client).await;
     println!("Vendor create_bill_map start..");
     VendorBillItem::create_bill_map(&mongodb, &client).await;
-    println!("call day_end_process start..");
-    client.execute("call day_end_process()", &[]).await.unwrap();
+    println!("insert into ac_txn for inv_opening..");
+    client
+        .execute("insert into ac_txn (id, sno, date, eff_date, account_id, account_name, base_account_types, branch_id, branch_name, debit, is_opening)
+(select gen_random_uuid(),1, min(date), min(date), 16,'Inventory Asset', array ['STOCK'], a.branch_id,min(a.branch_name), round(sum(asset_amount)::numeric, 2)::float, true from inv_txn a group by a.branch_id);", &[])
+        .await
+        .unwrap();
+    println!("refresh materialized start..");
+    client
+        .execute("refresh materialized view mvw_account_daily_summary", &[])
+        .await
+        .unwrap();
     println!("END***{}****", &mongodb.name());
 }

@@ -1,5 +1,3 @@
-use mongodb::bson::Uuid;
-
 use super::*;
 
 pub struct AccountOpening;
@@ -62,12 +60,47 @@ impl AccountOpening {
                 .unwrap();
             let mut ba: Vec<serde_json::Value> = Vec::new();
             if [16, 19].contains(&account_type) {
-                ba.push(serde_json::json!({
-                    "id": Uuid::new().to_string(),
-                    "amount": d._get_f64("debit").unwrap() - d._get_f64("credit").unwrap(),
-                    "ref_type": "ON_ACC",
-                    "ref_no": "OPENING",
-                }));
+                let mut on_acc_val = d._get_f64("debit").unwrap() - d._get_f64("credit").unwrap();
+                let allocs = mongodb
+                                .collection::<Document>("bill_allocations")
+                                .find(
+                                    doc! {"txnId": d.get_object_id("_id").unwrap()},
+                                    find_opts(
+                                        doc! {"txnId": 1, "amount": 1, "refNo": 1, "pending": 1, "refType": 1, "_id": 0},
+                                        doc! {},
+                                    ),
+                                )
+                                .await
+                                .unwrap()
+                                .try_collect::<Vec<Document>>()
+                                .await
+                                .unwrap();
+                for alloc in allocs {
+                    let oid = alloc.get_object_id("pending").unwrap().to_hex();
+                    let pending = format!(
+                        "{}-{}-4{}-{}-{}4444444",
+                        oid[0..8].to_owned(),
+                        oid[8..12].to_owned(),
+                        oid[12..15].to_owned(),
+                        oid[15..19].to_owned(),
+                        oid[19..24].to_owned(),
+                    );
+                    let amount = alloc._get_f64("amount").unwrap();
+                    on_acc_val -= amount;
+                    ba.push(serde_json::json!({
+                        "pending": pending,
+                        "amount": amount,
+                        "ref_type": alloc.get_str("refType").unwrap(),
+                        "ref_no": alloc.get_string("refNo").or(d.get_string("refNo")),
+                    }));
+                }
+                if round64(on_acc_val, 2) != 0.0 {
+                    ba.push(serde_json::json!({
+                        "amount": on_acc_val,
+                        "ref_type": "ON_ACC",
+                        "ref_no": "On acc value"
+                    }));
+                }
             }
             let data = serde_json::json!(
                 {

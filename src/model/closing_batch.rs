@@ -87,7 +87,6 @@ impl InventoryBranchBatch {
     returns bool as
 $$
 declare
-    _item          inventory_opening;
     _items         inventory_opening[] := (select array_agg(x)
                                            from jsonb_populate_recordset(
                                                         null::inventory_opening,
@@ -95,7 +94,11 @@ declare
     _inventory     inventory           := (select inventory
                                            from inventory
                                            where id = ($1 ->> 'inventory_id')::int);
-    _batch         batch;
+    _units         unit[]              := (select array_agg(a)
+                                           from unit a
+                                           where a.id in
+                                                 (select x.unit_id
+                                                  from unnest(_items) x));
     _division      division            := (select division
                                            from division
                                            where id = _inventory.division_id);
@@ -108,12 +111,15 @@ declare
     _book_begin    date                := (select book_begin - 1
                                            from organization
                                            limit 1);
+    _item          inventory_opening;
+    _batch         batch;
     _removed_items uuid[];
     retail         int;
     _cost          float;
     _landing_cost  float;
     _nlc           float;
     asset_amt      float;
+    _unit_name     text;
 begin
 
     select array_agg(x.id)
@@ -164,17 +170,17 @@ begin
                     batch_no      = excluded.batch_no,
                     asset_amount  = excluded.asset_amount
             returning * into _item;
-
+            select u.name into _unit_name from unnest(_units) u where u.id = _item.unit_id;
             insert into batch (txn_id, sno, inventory_id, reorder_inventory_id, inventory_name, inventory_hsn,
                                branch_id, branch_name, warehouse_id, warehouse_name, division_id, division_name,
                                entry_type, batch_no, expiry, entry_date, mrp, s_rate, opening_p_rate, landing_cost, nlc,
-                               cost, unit_id, unit_conv, manufacturer_id, manufacturer_name, retail_qty, label_qty,
-                               is_retail_qty)
+                               cost, unit_id, unit_name, unit_conv, manufacturer_id, manufacturer_name, retail_qty,
+                               label_qty, is_retail_qty)
             values (_item.id, _item.sno, _item.inventory_id, coalesce(_inventory.reorder_inventory_id, _inventory.id),
                     _inventory.name, _inventory.hsn_code, _item.branch_id, _branch.name, _item.warehouse_id,
                     _warehouse.name, _division.id, _division.name, 'OPENING', _item.batch_no, _item.expiry, _book_begin,
-                    _item.mrp, _item.s_rate, _item.rate, _landing_cost, _nlc, _cost, _item.unit_id, _item.unit_conv,
-                    _inventory.manufacturer_id, _inventory.manufacturer_name, _inventory.retail_qty,
+                    _item.mrp, _item.s_rate, _item.rate, _landing_cost, _nlc, _cost, _item.unit_id, _unit_name,
+                    _item.unit_conv, _inventory.manufacturer_id, _inventory.manufacturer_name, _inventory.retail_qty,
                     _item.qty * _item.unit_conv, _item.is_retail_qty)
             on conflict (txn_id) do update
                 set inventory_name    = excluded.inventory_name,
@@ -194,6 +200,8 @@ begin
                     nlc               = excluded.nlc,
                     cost              = excluded.cost,
                     landing_cost      = excluded.landing_cost,
+                    unit_id           = excluded.unit_id,
+                    unit_name         = excluded.unit_name,
                     unit_conv         = excluded.unit_conv,
                     manufacturer_id   = excluded.manufacturer_id,
                     manufacturer_name = excluded.manufacturer_name
@@ -237,7 +245,6 @@ $$ language plpgsql security definer;", &[]).await.unwrap();
     returns bool as
 $$
 declare
-    _item          inventory_opening;
     _items         inventory_opening[] := (select array_agg(x)
                                            from jsonb_populate_recordset(
                                                         null::inventory_opening,
@@ -245,7 +252,11 @@ declare
     _inventory     inventory           := (select inventory
                                            from inventory
                                            where id = ($1 ->> 'inventory_id')::int);
-    _batch         batch;
+    _units         unit[]              := (select array_agg(a)
+                                           from unit a
+                                           where a.id in
+                                                 (select x.unit_id
+                                                  from unnest(_items) x));
     _division      division            := (select division
                                            from division
                                            where id = _inventory.division_id);
@@ -258,12 +269,15 @@ declare
     _book_begin    date                := (select book_begin - 1
                                            from organization
                                            limit 1);
+    _item          inventory_opening;
+    _batch         batch;
     _removed_items uuid[];
     retail         int;
     _cost          float;
     _landing_cost  float;
     _nlc           float;
     asset_amt      float;
+    _unit_name     text;
 begin
 
     select array_agg(x.id)
@@ -314,17 +328,17 @@ begin
                     batch_no      = excluded.batch_no,
                     asset_amount  = excluded.asset_amount
             returning * into _item;
-
+            select u.name into _unit_name from unnest(_units) u where u.id = _item.unit_id;
             insert into batch (txn_id, sno, inventory_id, reorder_inventory_id, inventory_name, inventory_hsn,
                                branch_id, branch_name, warehouse_id, warehouse_name, division_id, division_name,
                                entry_type, batch_no, expiry, entry_date, mrp, s_rate, opening_p_rate, landing_cost, nlc,
-                               cost, unit_id, unit_conv, manufacturer_id, manufacturer_name, retail_qty, label_qty,
-                               is_retail_qty)
+                               cost, unit_id, unit_name, unit_conv, manufacturer_id, manufacturer_name, retail_qty,
+                               label_qty, is_retail_qty)
             values (_item.id, _item.sno, _item.inventory_id, coalesce(_inventory.reorder_inventory_id, _inventory.id),
                     _inventory.name, _inventory.hsn_code, _item.branch_id, _branch.name, _item.warehouse_id,
                     _warehouse.name, _division.id, _division.name, 'OPENING', _item.batch_no, _item.expiry, _book_begin,
-                    _item.mrp, _item.s_rate, _item.rate, _landing_cost, _nlc, _cost, _item.unit_id, _item.unit_conv,
-                    _inventory.manufacturer_id, _inventory.manufacturer_name, _inventory.retail_qty,
+                    _item.mrp, _item.s_rate, _item.rate, _landing_cost, _nlc, _cost, _item.unit_id, _unit_name,
+                    _item.unit_conv, _inventory.manufacturer_id, _inventory.manufacturer_name, _inventory.retail_qty,
                     _item.qty * _item.unit_conv, _item.is_retail_qty)
             on conflict (txn_id) do update
                 set inventory_name    = excluded.inventory_name,
@@ -344,6 +358,8 @@ begin
                     nlc               = excluded.nlc,
                     cost              = excluded.cost,
                     landing_cost      = excluded.landing_cost,
+                    unit_id           = excluded.unit_id,
+                    unit_name         = excluded.unit_name,
                     unit_conv         = excluded.unit_conv,
                     manufacturer_id   = excluded.manufacturer_id,
                     manufacturer_name = excluded.manufacturer_name

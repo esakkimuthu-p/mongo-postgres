@@ -12,7 +12,7 @@ impl Rack {
         while let Some(Ok(d)) = cur.next().await {
             postgres
                 .execute(
-                    "INSERT INTO stock_location (name) VALUES ($1)",
+                    "INSERT INTO stock_location (name) VALUES ($1) on conflict do nothing",
                     &[&d.get_str("displayName").unwrap()],
                 )
                 .await
