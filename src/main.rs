@@ -9,7 +9,7 @@ use model::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// mongodb Organization cluster MONGO-URI.
-    #[clap(short, long, default_value = "mongodb://localhost:27017/rkmedicals")]
+    #[clap(short, long, default_value = "mongodb://localhost:27017/ttgoldpalace")]
     mongodb: String,
 
     /// postgres Organization HOST.
