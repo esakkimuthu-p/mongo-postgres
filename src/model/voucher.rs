@@ -103,13 +103,6 @@ impl Voucher {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
-        postgres
-            .execute(
-                "ALTER TABLE voucher DISABLE TRIGGER tg_gen_voucher_no_for_voucher",
-                &[],
-            )
-            .await
-            .unwrap();
         postgres.execute("create or replace function insert_bank_allocation(voucher, jsonb, ac_txn)
     returns bool as
 $$
@@ -491,88 +484,8 @@ $$ language plpgsql;",
             println!("end {}...", collection);
         }
         postgres
-            .execute(
-                "ALTER TABLE voucher ENABLE TRIGGER tg_gen_voucher_no_for_voucher",
-                &[],
-            )
-            .await
-            .unwrap();
-        postgres
             .execute("drop function if exists create_voucher_via_script", &[])
             .await
             .unwrap();
-        postgres.execute("create or replace function insert_bank_allocation(voucher, jsonb, ac_txn)
-    returns bool as
-$$
-declare
-    alt_acc account;
-    i       json;
-    _sno    smallint := 1;
-begin
-    for i in select jsonb_array_elements($2)
-        loop
-            select * into alt_acc from account where id = (i ->> 'alt_account_id')::int;
-            insert into bank_txn (id, sno, ac_txn_id, date, inst_date, inst_no, in_favour_of, is_memo, amount,
-                                  account_id, account_name, base_account_types, alt_account_id, alt_account_name,
-                                  particulars, branch_id, branch_name, voucher_id, voucher_no, base_voucher_type,
-                                  bank_beneficiary_id, txn_type)
-            values (coalesce((i ->> 'id')::uuid, gen_random_uuid()), _sno, $3.id, $1.date, (i ->> 'inst_date')::date,
-                    (i ->> 'inst_no')::text, (i ->> 'in_favour_of')::text, $3.is_memo, (i ->> 'amount')::float,
-                    $3.account_id, $3.account_name, $3.base_account_types, alt_acc.id, alt_acc.name,
-                    (i ->> 'particulars')::text, $1.branch_id, $1.branch_name, $1.id, $1.voucher_no,
-                    $1.base_voucher_type, alt_acc.bank_beneficiary_id, (i ->> 'txn_type')::text);
-            _sno = _sno + 1;
-        end loop;
-    return true;
-end;
-$$ language plpgsql;", &[]).await.unwrap();
-
-        postgres.execute("create or replace function insert_bill_allocation(voucher, jsonb, ac_txn)
-    returns bool as
-$$
-declare
-    agent_acc account;
-    ba        bill_allocation;
-    i         json;
-    p_id      uuid;
-    _sno      smallint := 1;
-    rt        text;
-begin
-    select * into agent_acc from account where id = (select agent_id account where id = $3.account_id);
-    for i in select jsonb_array_elements($2)
-        loop
-            rt = (i ->> 'ref_type');
-            if rt = 'NEW' then
-                p_id = coalesce((i ->> 'pending')::uuid, gen_random_uuid());
-                select * into ba from bill_allocation where pending=p_id and ref_type='NEW';
-                if ba is not null then
-                    raise exception 'This new ref already exist';
-                end if;
-            elseif rt = 'ADJ' then
-                p_id = (i ->> 'pending')::uuid;
-                if p_id is null then raise exception 'pending must be required for adjusted ref'; end if;
-                select * into ba from bill_allocation where pending=p_id and ref_type='NEW';
-                if ba is null then raise exception 'New ref not found for adjusted ref'; end if;
-            else
-                p_id = null;
-            end if;
-            insert into bill_allocation (id, sno, ac_txn_id, date, eff_date, is_memo, account_id, account_name, base_account_types,
-                                         branch_id, branch_name, amount, pending, ref_type, voucher_id, ref_no,
-                                         base_voucher_type, voucher_mode, voucher_no, agent_id, agent_name,
-                                         is_approved)
-            values (coalesce((i ->> 'id')::uuid, gen_random_uuid()), _sno, $3.id, $1.date,coalesce($1.eff_date, $1.date),
-                     $3.is_memo, $3.account_id, $3.account_name, $3.base_account_types,
-                     $1.branch_id, $1.branch_name, (i ->> 'amount')::float,
-                    p_id, rt, $1.id,
-                    (case when rt='ADJ' then coalesce((i ->> 'ref_no')::text, ba.ref_no) else coalesce((i ->> 'ref_no')::text, $3.ref_no) end),
-                    (case when rt='ADJ' then ba.base_voucher_type else $1.base_voucher_type end),
-                    (case when rt='ADJ' then ba.voucher_mode else $1.mode end),
-                    (case when rt='ADJ' then ba.voucher_no else $1.voucher_no end),
-                    agent_acc.id,agent_acc.name,$1.require_no_of_approval = $1.approval_state);
-            _sno = _sno + 1;
-        end loop;
-    return true;
-end;
-$$ language plpgsql;", &[]).await.unwrap();
     }
 }

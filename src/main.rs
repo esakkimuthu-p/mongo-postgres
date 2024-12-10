@@ -9,14 +9,14 @@ use model::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// mongodb Organization cluster MONGO-URI.
-    #[clap(short, long, default_value = "mongodb://localhost:27017/ttgoldpalace")]
+    #[clap(short, long, default_value = "mongodb://localhost:27017/mamedicals")]
     mongodb: String,
 
     /// postgres Organization HOST.
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:55432/rkmedicals"
+        default_value = "postgresql://postgres:1@localhost:5432/mamedicals"
     )]
     postgres: String,
 }
@@ -50,12 +50,28 @@ async fn main() {
     Account::map(&mongodb).await;
     println!("Account start..");
     Account::create(&mongodb, &client).await;
+    println!("Customer Vendor start..");
+    Contact::create(&mongodb, &client).await;
+    client
+            .execute("
+            do
+    $$
+        declare
+            i record;
+        begin
+            for i in (select action_statement as fn, event_object_table as tbl, trigger_name as tri from information_schema.triggers)
+                loop
+                    execute format('drop trigger if exists %s on %s cascade', i.tri, i.tbl);
+                end loop;
+        end;
+    $$;
+            ", &[])
+            .await
+            .unwrap();
     println!("GstRegistration start..");
     GstRegistration::create(&mongodb, &client).await;
     println!("Branch start..");
     Branch::create(&mongodb, &client).await;
-    println!("Customer Vendor start..");
-    Contact::create(&mongodb, &client).await;
     println!("Doctor start..");
     Doctor::create(&mongodb, &client).await;
     println!("Manufacturer start..");
@@ -94,14 +110,9 @@ async fn main() {
     VendorBillItem::create_bill_map(&mongodb, &client).await;
     println!("insert into ac_txn for inv_opening..");
     client
-        .execute("insert into ac_txn (id, sno, date, eff_date, account_id, account_name, base_account_types, branch_id, branch_name, debit, is_opening)
-(select gen_random_uuid(),1, min(date), min(date), 16,'Inventory Asset', array ['STOCK'], a.branch_id,min(a.branch_name), round(sum(asset_amount)::numeric, 2)::float, true from inv_txn a group by a.branch_id);", &[])
-        .await
-        .unwrap();
-    println!("refresh materialized start..");
-    client
-        .execute("refresh materialized view mvw_account_daily_summary", &[])
-        .await
-        .unwrap();
+            .execute("insert into ac_txn (id, sno, date, eff_date, account_id, account_name, base_account_types, branch_id, branch_name, debit, is_opening)
+    (select gen_random_uuid(),1, min(date), min(date), 16,'Inventory Asset', array ['STOCK'], a.branch_id,min(a.branch_name), round(sum(asset_amount)::numeric, 2)::float, true from inv_txn a group by a.branch_id);", &[])
+            .await
+            .unwrap();
     println!("END***{}****", &mongodb.name());
 }

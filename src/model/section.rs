@@ -27,7 +27,7 @@ impl Section {
             let object_id = d.get_object_id("_id").unwrap();
             let id: i32 = postgres
                 .query_one(
-                    "INSERT INTO category_option (name, category_id, active) VALUES ($1, 'INV_CAT1', true) returning id",
+                    "INSERT INTO category_option (name, category_id, active, category_name) VALUES ($1, 'INV_CAT1', true, 'Sections') returning id",
                     &[&d.get_str("name").unwrap()],
                 )
                 .await

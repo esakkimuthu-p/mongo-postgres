@@ -51,14 +51,21 @@ impl Member {
         let ui_perms = json!([
             "inv.cus.vw",
             "inv.cus.cr",
-            "ac.ac.vw",
-            "ac.ac.cr",
             "inv.doc.vw",
             "inv.doc.cr",
+            "inv.inv.asl",
+            "ac.ctra.cr",
             "ac.pmt.cr",
+            "ac.rcpt.cr",
             "inv.sb.vw",
             "inv.sb.cr",
-            "inv.stkded.cr"
+            "inv.srb.cr",
+            "inv.stkded.cr",
+            "inv.stkadd.cr",
+            "utly.pos.den",
+            "rpt.sltg",
+            "inv.stkadd.vw",
+            "inv.stkded.vw"
         ]);
         postgres
             .execute(

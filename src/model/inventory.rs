@@ -39,7 +39,7 @@ impl Inventory {
             .collection::<Document>("manufacturers")
             .find(
                 doc! {},
-                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
+                find_opts(doc! {"_id": 1, "postgres": 1, "name": 1}, doc! {"_id": 1}),
             )
             .await
             .unwrap()
@@ -139,7 +139,7 @@ impl Inventory {
                         .map(|x| x.as_str().unwrap().to_string().clone())
                         .collect::<Vec<String>>()
                 })
-                .ok();
+                .unwrap_or_default();
             let mut salts = Vec::new();
             if d.get_bool("scheduleH").unwrap_or_default() {
                 salts.push(1);
@@ -164,8 +164,10 @@ impl Inventory {
             let mut category1 = None;
             if let Ok(id) = d.get_object_id("manufacturerId") {
                 manufacturer = manufacturers.iter().find_map(|x| {
-                    (x.get_object_id("_id").unwrap() == id)
-                        .then_some(x._get_i32("postgres").unwrap())
+                    (x.get_object_id("_id").unwrap() == id).then_some((
+                        x._get_i32("postgres").unwrap(),
+                        x.get_str("name").unwrap_or_default(),
+                    ))
                 });
             }
             if let Ok(id) = d.get_object_id("sectionId") {
@@ -211,8 +213,8 @@ impl Inventory {
                         "INSERT INTO inventory 
                         (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
                             purchase_config,sale_config, barcodes,hsn_code, description, manufacturer_id, 
-                            tags,retail_qty,category1) VALUES 
-                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id",
+                            tags,retail_qty,category1, manufacturer_name) VALUES 
+                        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, $18) returning id",
                         &[
                             &name,
                             &division,
@@ -224,13 +226,14 @@ impl Inventory {
                             &cess,
                             &serde_json::json!({"mrp_editable": true, "tax_editable": true, "free_editable": true, "disc_1_editable": true, "disc_2_editable": true, "p_rate_editable": true, "s_rate_editable": true}),
                             &serde_json::json!({"rate_editable": false, "tax_editable": false, "unit_editable": false, "disc_editable": false}),
-                            &barcodes,
+                            &(!barcodes.is_empty()).then_some(barcodes.clone()),
                             &d.get_str("hsnCode").ok(),
                             &d.get_str("description").ok(),
-                            &manufacturer,
+                            &manufacturer.map(|x|x.0),
                             &(!salts.is_empty()).then_some(salts.clone()),
                             &retail_qty,
-                            &category1
+                            &category1,
+                            &manufacturer.map(|x|x.1),
                         ],
                     )
                     .await
@@ -269,10 +272,11 @@ impl Inventory {
                                 postgres
                                 .execute(
                                     "INSERT INTO inventory_branch_detail 
-                                    (inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, stock_location_id) 
+                                    (inventory_id,reorder_inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, stock_location_id) 
                                     VALUES 
-                                    ($1,$2,$3,$4,$5,$6)",
+                                    ($1,$2,$3,$4,$5,$6,$7)",
                                     &[
+                                        &id,
                                         &id,
                                         &name,
                                         &branch_id,
