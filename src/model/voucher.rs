@@ -298,6 +298,7 @@ $$ language plpgsql;",
                 let voucher_no =
                     Self::voucher_no(&d.get_string("voucherNo").unwrap(), branch_prefix, &fy);
                 let mut ac_trns: Vec<Value> = Vec::new();
+                let mut voucher_mode = "ACCOUNT";
                 let trns = d.get_array_document("acTrns").unwrap_or_default();
                 let mut amount = 0.0;
                 for trn in trns.clone() {
@@ -422,6 +423,7 @@ $$ language plpgsql;",
                         (!["GST_RECEIVABLE", "GST_PAYABLE"]
                             .contains(&trn.get_str("accountType").unwrap())),
                     ) {
+                        voucher_mode = "GST";
                         let gst_tax = gst_taxes
                             .clone()
                             .into_iter()
@@ -455,7 +457,7 @@ $$ language plpgsql;",
                    "eff_date": &d.get_string("effDate"),
                     "branch_id":&branch,
                     "voucher_type_id": &voucher_type,
-                    "mode": "ACCOUNT",
+                    "mode": voucher_mode,
                     "ref_no": &d.get_string("refNo"),
                    "description": &d.get_string("description"),
                    "ac_trns": &serde_json::to_value(ac_trns).unwrap(),

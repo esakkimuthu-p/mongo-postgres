@@ -18,7 +18,14 @@ impl Section {
         let mut updates = Vec::new();
         postgres
             .execute(
-                "update category set category = 'Sections' where id = 'INV_CAT1'",
+                "update category set category = 'Sections', active = true where id = 'INV_CAT1'",
+                &[],
+            )
+            .await
+            .unwrap();
+        postgres
+            .execute(
+                "alter table category_option drop constraint if exists category_option_category_id_name_key;",
                 &[],
             )
             .await
@@ -45,5 +52,27 @@ impl Section {
             };
             mongodb.run_command(command, None).await.unwrap();
         }
+        postgres
+            .execute(
+                "
+        with a as (select *
+		   from category_option
+		   where name in (select name from category_option group by name having count(1) > 1))
+        update category_option b
+        set name = concat(a.name, '#', a.id)
+        from a
+        where b.id = a.id;
+                ",
+                &[],
+            )
+            .await
+            .unwrap();
+        postgres
+            .execute(
+                "alter table category_option add unique (category_id, name);",
+                &[],
+            )
+            .await
+            .unwrap();
     }
 }

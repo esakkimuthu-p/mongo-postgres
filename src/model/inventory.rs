@@ -8,7 +8,7 @@ impl Inventory {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
         postgres
             .execute(
-                "INSERT INTO price_list (id, name) overriding system value VALUES (1, 'main price list')",
+                "INSERT INTO price_list (id, name) overriding system value VALUES (1, 'main price list') on conflict do nothing;",
                 &[],
             )
             .await
@@ -248,7 +248,7 @@ impl Inventory {
                     {
                         let branch = branches.iter().find(|x| {
                             x.get_object_id("_id").unwrap()
-                                == br_de.get_object_id("branch").unwrap()
+                                == br_de.get_object_id("branch").unwrap_or_default()
                         });
                         if let Some(br) = branch {
                             let branch_id = br._get_i32("postgres").unwrap();
@@ -256,37 +256,37 @@ impl Inventory {
                                 let rack_id = br_de
                                     ._get_document("rack")
                                     .and_then(|x| x.get_object_id("id").ok());
-                                let mut rack_name = None;
                                 if let Some(rac) = rack_id {
-                                    rack_name = racks.iter().find_map(|x| {
+                                    if let Some(stock_location) = racks.iter().find_map(|x| {
                                         (x.get_object_id("_id").unwrap() == rac)
                                             .then_some(x.get_string("displayName").unwrap())
-                                    });
+                                    }) {
+                                        postgres.execute(
+                                        "INSERT INTO inventory_branch_detail 
+                                        (inventory_id,reorder_inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, stock_location_id) 
+                                        VALUES 
+                                        ($1,$2,$3,$4,$5,$6,$7)",
+                                        &[
+                                            &id,
+                                            &id,
+                                            &name,
+                                            &branch_id,
+                                            &br.get_str("name").unwrap(),
+                                            &barcodes,
+                                            &stock_location
+                                        ],
+                                    )
+                                    .await
+                                    .unwrap();
+                                    }
                                 }
+
                                 if let Some(s_disc) = br_de
                                     ._get_document("sDisc")
                                     .and_then(|x| x._get_f64("amount"))
                                 {
                                     disc_values.push(s_disc);
                                 }
-                                postgres
-                                .execute(
-                                    "INSERT INTO inventory_branch_detail 
-                                    (inventory_id,reorder_inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, stock_location_id) 
-                                    VALUES 
-                                    ($1,$2,$3,$4,$5,$6,$7)",
-                                    &[
-                                        &id,
-                                        &id,
-                                        &name,
-                                        &branch_id,
-                                        &br.get_str("name").unwrap(),
-                                        &barcodes,
-                                        &rack_name
-                                    ],
-                                )
-                                .await
-                                .unwrap();
                             }
                         }
                     }
