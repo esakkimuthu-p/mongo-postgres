@@ -86,6 +86,9 @@ impl Doc for Document {
 
     fn _get_f64(&self, key: &str) -> Option<f64> {
         if let Ok(f) = self.get_f64(key) {
+            if f.is_nan() {
+                return Some(0.0);
+            }
             return Some(f);
         } else if let Ok(i) = self.get_i64(key) {
             return Some(i as f64);

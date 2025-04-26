@@ -85,18 +85,16 @@ impl Branch {
                 .get_array("members")
                 .unwrap_or(&vec![])
                 .iter()
-                .map(|x| x.as_object_id().unwrap_or_default())
+                .filter_map(|x| x.as_object_id())
                 .collect::<Vec<ObjectId>>();
             let mut m_ids = Vec::new();
             for m in branch_members {
-                let mid = members
-                    .iter()
-                    .find_map(|x| {
-                        (x.get_object_id("_id").unwrap() == m)
-                            .then_some(x._get_i32("postgres").unwrap())
-                    })
-                    .unwrap();
-                m_ids.push(mid)
+                if let Some(mid) = members.iter().find_map(|x| {
+                    (x.get_object_id("_id").unwrap() == m)
+                        .then_some(x._get_i32("postgres").unwrap())
+                }) {
+                    m_ids.push(mid);
+                }
             }
             let gst_registration = gst_registrations
                 .iter()

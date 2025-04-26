@@ -9,14 +9,14 @@ use model::*;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// mongodb Organization cluster MONGO-URI.
-    #[clap(short, long, default_value = "mongodb://localhost:27017/mamedicals")]
+    #[clap(short, long, default_value = "mongodb://localhost:27017/velavanhm")]
     mongodb: String,
 
     /// postgres Organization HOST.
     #[clap(
         short,
         long,
-        default_value = "postgresql://postgres:1@localhost:5432/mamedicals"
+        default_value = "postgresql://postgres:1@localhost:5434/velavanhm"
     )]
     postgres: String,
 }
@@ -38,6 +38,20 @@ async fn main() {
         .await
         .unwrap()
         .default_database()
+        .unwrap();
+    client
+        .execute(
+            "alter table account drop constraint if exists gst_no_invalid;",
+            &[],
+        )
+        .await
+        .unwrap();
+    client
+        .execute(
+            "alter table inventory drop constraint if exists hsn_code_invalid;",
+            &[],
+        )
+        .await
         .unwrap();
     println!("START***{}****", &mongodb.name());
     println!("Member start..");
