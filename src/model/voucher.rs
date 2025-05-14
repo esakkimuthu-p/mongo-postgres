@@ -216,7 +216,7 @@ $$ language plpgsql;",
             let mut cur = mongodb
             .collection::<Document>(collection)
             .find(
-                doc! {"act": false},
+                doc! {"act": false, "date": {"$gte": "2025-01-01"}},
                 find_opts(
                     doc! {"createdBy": 0, "createdAt": 0, "updatedAt": 0, "updatedBy": 0, "invTrns": 0},
                     doc! {"_id": 1},

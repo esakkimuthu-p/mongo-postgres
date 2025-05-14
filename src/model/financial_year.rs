@@ -4,17 +4,13 @@ pub struct FinancialYear;
 
 impl FinancialYear {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
-        let mut cur = mongodb
+        let cur = mongodb
             .collection::<Document>("financial_years")
-            .find(doc! {}, None)
+            .find_one(doc! {"fStart": "2025-04-01"}, None)
             .await
             .unwrap();
         let mut updates = Vec::new();
-        postgres
-            .execute("DELETE FROM financial_year", &[])
-            .await
-            .unwrap();
-        while let Some(Ok(d)) = cur.next().await {
+        if let Some(d) = &cur {
             let object_id = d.get_object_id("_id").unwrap();
             let id : i32 = postgres
                 .query_one(

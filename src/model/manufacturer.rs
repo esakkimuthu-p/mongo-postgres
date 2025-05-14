@@ -4,6 +4,11 @@ pub struct Manufacturer;
 
 impl Manufacturer {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
+        mongodb
+            .collection::<Document>("manufacturers")
+            .delete_many(doc! {"name": null}, None)
+            .await
+            .unwrap();
         let mut cur = mongodb
             .collection::<Document>("manufacturers")
             .find(
