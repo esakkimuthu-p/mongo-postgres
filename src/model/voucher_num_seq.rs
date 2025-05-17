@@ -1,3 +1,5 @@
+use mongodb::bson::oid::ObjectId;
+
 use super::*;
 
 pub struct VoucherNumSequence;
@@ -28,15 +30,22 @@ impl VoucherNumSequence {
             .unwrap();
         let financial_years = mongodb
             .collection::<Document>("financial_years")
-            .find(doc! {}, find_opts(doc! {"_id": 1, "postgres": 1}, doc! {}))
+            .find(
+                doc! {"postgres": {"$exists": true}},
+                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {}),
+            )
             .await
             .unwrap()
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
+        let financial_year_ids = financial_years
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap())
+            .collect::<Vec<ObjectId>>();
         let mut cur = mongodb
             .collection::<Document>("voucher_numberings")
-            .find(doc! {}, None)
+            .find(doc! {"fYear": {"$in":financial_year_ids }}, None)
             .await
             .unwrap();
 

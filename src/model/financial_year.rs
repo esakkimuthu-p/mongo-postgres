@@ -4,6 +4,15 @@ pub struct FinancialYear;
 
 impl FinancialYear {
     pub async fn create(mongodb: &Database, postgres: &PostgresClient) {
+        mongodb
+            .collection::<Document>("financial_years")
+            .update_one(
+                doc! {"fStart": "2024-04-01"},
+                doc! {"$set": {"postgres": 1}},
+                None,
+            )
+            .await
+            .unwrap();
         let cur = mongodb
             .collection::<Document>("financial_years")
             .find_one(doc! {"fStart": "2025-04-01"}, None)

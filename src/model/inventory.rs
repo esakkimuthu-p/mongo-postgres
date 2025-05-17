@@ -57,17 +57,6 @@ impl Inventory {
             .try_collect::<Vec<Document>>()
             .await
             .unwrap();
-        let closing_batches = mongodb
-            .collection::<Document>("closing_batches")
-            .find(
-                doc! {},
-                find_opts(doc! {"_id": 0, "inventory": 1, "unitConv": 1}, doc! {}),
-            )
-            .await
-            .unwrap()
-            .try_collect::<Vec<Document>>()
-            .await
-            .unwrap();
         let pharma_salts = mongodb
             .collection::<Document>("pharma_salts")
             .find(
@@ -112,7 +101,7 @@ impl Inventory {
             )
             .await
             .unwrap();
-        let mut updates = Vec::new();
+        let mut updates: Vec<Document> = Vec::with_capacity(10000);
         while let Some(Ok(d)) = cur.next().await {
             let object_id = d.get_object_id("_id").unwrap();
             let inv_units = d.get_array_document("units").unwrap();
@@ -192,23 +181,18 @@ impl Inventory {
                 .unwrap();
             for u in inv_units {
                 let retail_qty = u._get_i32("conversion").unwrap();
-                let has_stock = closing_batches.iter().any(|x| {
-                    x.get_object_id("inventory").unwrap() == object_id
-                        && retail_qty == x._get_i32("unitConv").unwrap()
-                });
-                if has_stock {
-                    let mut name = d.get_string("name").unwrap();
-                    let unit_name = units
-                        .iter()
-                        .find_map(|x| {
-                            (x.get_object_id("_id").unwrap() == u.get_object_id("unitId").unwrap())
-                                .then_some(x.get_str("name").unwrap())
-                        })
-                        .unwrap();
-                    if retail_qty != 1 {
-                        name = format!("{} - {}", name, unit_name);
-                    }
-                    let id : i32 = postgres
+                let mut name = d.get_string("name").unwrap();
+                let unit_name = units
+                    .iter()
+                    .find_map(|x| {
+                        (x.get_object_id("_id").unwrap() == u.get_object_id("unitId").unwrap())
+                            .then_some(x.get_str("name").unwrap())
+                    })
+                    .unwrap();
+                if retail_qty != 1 {
+                    name = format!("{} - {}", name, unit_name);
+                }
+                let id : i32 = postgres
                     .query_one(
                         "INSERT INTO inventory 
                         (name, division_id, allow_negative_stock, gst_tax_id, unit_id, sale_unit_id, purchase_unit_id,cess,
@@ -238,30 +222,30 @@ impl Inventory {
                     )
                     .await
                     .unwrap().get(0);
-                    let mut b_ids = HashSet::new();
-                    let mut disc_values = vec![];
-                    for br_de in d
-                        .get_array("branchDetails")
-                        .unwrap_or(&vec![])
-                        .iter()
-                        .map(|x| x.as_document().unwrap())
-                    {
-                        let branch = branches.iter().find(|x| {
-                            x.get_object_id("_id").unwrap()
-                                == br_de.get_object_id("branch").unwrap_or_default()
-                        });
-                        if let Some(br) = branch {
-                            let branch_id = br._get_i32("postgres").unwrap();
-                            if b_ids.insert(branch_id) {
-                                let rack_id = br_de
-                                    ._get_document("rack")
-                                    .and_then(|x| x.get_object_id("id").ok());
-                                if let Some(rac) = rack_id {
-                                    if let Some(stock_location) = racks.iter().find_map(|x| {
-                                        (x.get_object_id("_id").unwrap() == rac)
-                                            .then_some(x.get_string("displayName").unwrap())
-                                    }) {
-                                        postgres.execute(
+                let mut b_ids = HashSet::new();
+                let mut disc_values = vec![];
+                for br_de in d
+                    .get_array("branchDetails")
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .map(|x| x.as_document().unwrap())
+                {
+                    let branch = branches.iter().find(|x| {
+                        x.get_object_id("_id").unwrap()
+                            == br_de.get_object_id("branch").unwrap_or_default()
+                    });
+                    if let Some(br) = branch {
+                        let branch_id = br._get_i32("postgres").unwrap();
+                        if b_ids.insert(branch_id) {
+                            let rack_id = br_de
+                                ._get_document("rack")
+                                .and_then(|x| x.get_object_id("id").ok());
+                            if let Some(rac) = rack_id {
+                                if let Some(stock_location) = racks.iter().find_map(|x| {
+                                    (x.get_object_id("_id").unwrap() == rac)
+                                        .then_some(x.get_string("displayName").unwrap())
+                                }) {
+                                    postgres.execute(
                                         "INSERT INTO inventory_branch_detail 
                                         (inventory_id,reorder_inventory_id,inventory_name, branch_id, branch_name, inventory_barcodes, stock_location_id) 
                                         VALUES 
@@ -278,36 +262,48 @@ impl Inventory {
                                     )
                                     .await
                                     .unwrap();
-                                    }
                                 }
+                            }
 
-                                if let Some(s_disc) = br_de
-                                    ._get_document("sDisc")
-                                    .and_then(|x| x._get_f64("amount"))
-                                {
-                                    disc_values.push(s_disc);
-                                }
+                            if let Some(s_disc) = br_de
+                                ._get_document("sDisc")
+                                .and_then(|x| x._get_f64("amount"))
+                            {
+                                disc_values.push(s_disc);
                             }
                         }
                     }
-                    updates.push(doc! {
-                        "q": { "inventory": object_id, "unitConv": retail_qty },
-                        "u": { "$set": { "postgres": id, "postgres_unit": primary_unit} },
-                        "multi": true
-                    });
-                    if !(disc_values.is_empty()) {
-                        let x = disc_values.into_iter().fold(f64::NEG_INFINITY, f64::max);
-                        postgres
-                            .execute(
-                                "INSERT INTO price_list_condition 
+                }
+                updates.push(doc! {
+                    "q": { "inventory": object_id, "unitConv": retail_qty },
+                    "u": { "$set": { "postgres": id, "postgres_unit": primary_unit} },
+                    "multi": true
+                });
+                if !(disc_values.is_empty()) {
+                    let x = disc_values.into_iter().fold(f64::NEG_INFINITY, f64::max);
+                    postgres
+                        .execute(
+                            "INSERT INTO price_list_condition 
                                     (apply_on, computation, price_list_id, value, inventory_id) 
                                     VALUES 
                                     ('INVENTORY','DISCOUNT',1,$1,$2)",
-                                &[&x, &id],
-                            )
-                            .await
-                            .unwrap();
-                    }
+                            &[&x, &id],
+                        )
+                        .await
+                        .unwrap();
+                }
+                if updates.len() == 10000 {
+                    let command = doc! {
+                        "update": "closing_batches",
+                        "updates": &updates
+                    };
+                    mongodb.run_command(command, None).await.unwrap();
+                    let command = doc! {
+                        "update": "vendor_item_mappings",
+                        "updates": &updates
+                    };
+                    mongodb.run_command(command, None).await.unwrap();
+                    updates.clear();
                 }
             }
         }
@@ -323,12 +319,5 @@ impl Inventory {
             };
             mongodb.run_command(command, None).await.unwrap();
         }
-        postgres
-            .execute(
-                "delete from unit u where u.id not in (select distinct unit_id from inventory)",
-                &[],
-            )
-            .await
-            .unwrap();
     }
 }

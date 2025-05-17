@@ -93,7 +93,8 @@ impl AccountOpening {
                 vec![
                     doc! {
                         "$match": {
-                            "date": { "$lt": "2025-01-01" }
+                            "date": { "$lt": "2025-01-01" },
+                            "accountType": {"$ne": "STOCK"}
                         }
                     },
                     doc! {
