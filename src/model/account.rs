@@ -1,3 +1,5 @@
+use mongodb::bson::oid::ObjectId;
+
 use super::*;
 
 pub const DEFAULT_NAMES: [&str; 15] = [
@@ -21,6 +23,206 @@ pub struct Account;
 
 impl Account {
     pub async fn map(mongodb: &Database) {
+        mongodb
+            .collection::<Document>("account_transactions")
+            .aggregate(
+                vec![
+                    doc! {
+                        "$match": {
+                            "date": { "$lt": "2025-01-01" },
+                            "accountType": { "$in" : [ "GST_PAYABLE", "GST_RECEIVABLE", "SALE", "PURCHASE"] },
+                        }
+                    },
+                    doc! {
+                        "$group": {
+                            "_id": { "branch_id": "$branch", "account_id": "$account" },
+                            "closing": { "$sum": { "$subtract": ["$debit", "$credit"] } }
+                        }
+                    },
+                    doc! {
+                        "$addFields": {
+                            "closing": { "$round": ["$closing", 2] },
+                            "branch_id": "$_id.branch_id",
+                            "account_id": "$_id.account_id",
+                        }
+                    },
+                    doc! {
+                        "$match": { "closing": { "$ne": 0 } }
+                    },
+                    doc! {
+                        "$project": {
+                            "_id": 0,
+                            "branch_id": 1,
+                            "account_id": 1,
+                            "closing": 1,
+                        }
+                    },
+                    doc! {
+                        "$out": "gst_sal_pur_acc_op"
+                    },
+                ],
+                None,
+            )
+            .await
+            .unwrap();
+        let sale_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "SALE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        let mut updates = vec![
+            doc! {"q": { "account_id": {"$in": sale_ids}}, "u": {"$set": {"postgres": 2} }, "multi": true},
+        ];
+        let pur_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "PURCHASE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": pur_ids}}, "u": {"$set": {"postgres": 3} }, "multi": true});
+        let cgst_pay_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "CGST_PAYABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": cgst_pay_ids}}, "u": {"$set": {"postgres": 4} }, "multi": true});
+        let sgst_pay_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "SGST_PAYABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": sgst_pay_ids}}, "u": {"$set": {"postgres": 5} }, "multi": true});
+        let igst_pay_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "IGST_PAYABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": igst_pay_ids}}, "u": {"$set": {"postgres": 6} }, "multi": true});
+        let cess_pay_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "CESS_PAYABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": cess_pay_ids}}, "u": {"$set": {"postgres": 7} }, "multi": true});
+        let cgst_rec_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "CGST_RECEIVABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": cgst_rec_ids}}, "u": {"$set": {"postgres": 8} }, "multi": true});
+        let sgst_rec_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "SGST_RECEIVABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": sgst_rec_ids}}, "u": {"$set": {"postgres": 9} }, "multi": true});
+        let igst_rec_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "IGST_RECEIVABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": igst_rec_ids}}, "u": {"$set": {"postgres": 10} }, "multi": true});
+        let cess_rec_ids = mongodb
+            .collection::<Document>("accounts")
+            .find(
+                doc! { "defaultName": {"$regex": "CESS_RECEIVABLE"}},
+                find_opts(doc! {"_id": 1}, doc! {}),
+            )
+            .await
+            .unwrap()
+            .try_collect::<Vec<Document>>()
+            .await
+            .unwrap()
+            .iter()
+            .map(|x| x.get_object_id("_id").unwrap_or_default())
+            .collect::<Vec<ObjectId>>();
+        updates.push(doc! {"q": { "account_id": {"$in": cess_rec_ids}}, "u": {"$set": {"postgres": 11} }, "multi": true});
+        let command = doc! {
+            "update": "gst_sal_pur_acc_op",
+            "updates": &updates
+        };
+        mongodb.run_command(command, None).await.unwrap();
+
         let updates = vec![
             doc! {"q": { "defaultName": "CASH"}, "u": {"$set": {"postgres": 1} }},
             doc! {"q": { "defaultName" : {"$regex": "SALE"}}, "u": {"$set": {"postgres": 2}}, "multi": true},

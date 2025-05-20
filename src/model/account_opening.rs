@@ -10,7 +10,7 @@ impl AccountOpening {
                 doc! {},
                 find_opts(
                     doc! {"_id": 1, "postgres": 1, "postgresAccountType": 1},
-                    doc! {"_id": 1},
+                    doc! {},
                 ),
             )
             .await
@@ -20,10 +20,7 @@ impl AccountOpening {
             .unwrap();
         let branches = mongodb
             .collection::<Document>("branches")
-            .find(
-                doc! {},
-                find_opts(doc! {"_id": 1, "postgres": 1}, doc! {"_id": 1}),
-            )
+            .find(doc! {}, find_opts(doc! {"_id": 1, "postgres": 1}, doc! {}))
             .await
             .unwrap()
             .try_collect::<Vec<Document>>()
@@ -94,7 +91,7 @@ impl AccountOpening {
                     doc! {
                         "$match": {
                             "date": { "$lt": "2025-01-01" },
-                            "accountType": {"$ne": "STOCK"}
+                            "accountType": { "$nin" : [ "STOCK", "GST_PAYABLE", "GST_RECEIVABLE", "SALE", "PURCHASE"] },
                         }
                     },
                     doc! {
@@ -180,7 +177,7 @@ impl AccountOpening {
                         "pending": pending,
                         "amount": amount,
                         "ref_type": "NEW",
-                        "ref_no": format!("vNo: {}, vTy: {}", alloc.get_string("voucher_no").or(alloc.get_string("ref_no")).unwrap_or("OPENING".to_string()), alloc.get_string("voucher_type").unwrap_or_default()),
+                        "ref_no": format!("#{}, &{}", alloc.get_string("voucher_no").or(alloc.get_string("ref_no")).unwrap_or_default(), alloc.get_string("voucher_type").unwrap_or("OPENING".to_string())),
                     }));
                 }
                 if round64(on_acc_val, 2) != 0.0 {
@@ -197,6 +194,34 @@ impl AccountOpening {
                     "bill_allocations": (!ba.is_empty()).then_some(serde_json::to_value(ba).unwrap())
                 }
             );
+            postgres
+                .execute("select * from set_account_opening($1::json)", &[&data])
+                .await
+                .unwrap();
+        }
+        // sec
+        let mut cur = mongodb
+            .collection::<Document>("gst_sal_pur_acc_op")
+            .find(doc! {}, None)
+            .await
+            .unwrap();
+        while let Some(Ok(d)) = cur.next().await {
+            let account = d._get_i32("postgres").unwrap();
+            let branch = branches
+                .iter()
+                .find_map(|x| {
+                    (x.get_object_id("_id").unwrap() == d.get_object_id("branch_id").unwrap())
+                        .then_some(x._get_i32("postgres").unwrap())
+                })
+                .unwrap();
+            let closing = d._get_f64("closing").unwrap();
+            let (dr, cr) = if closing > 0.0 {
+                (closing, 0.0)
+            } else {
+                (0.0, closing.abs())
+            };
+
+            let data = serde_json::json!({"account_id": account, "branch_id": branch, "credit": cr, "debit": dr});
             postgres
                 .execute("select * from set_account_opening($1::json)", &[&data])
                 .await
